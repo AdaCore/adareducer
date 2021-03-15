@@ -2,6 +2,7 @@ import click
 from src import engine
 import os
 
+
 @click.command()
 @click.argument("project_file")
 @click.argument("main_file")
@@ -28,5 +29,6 @@ def main(project_file, main_file, predicate):
     r = engine.Reducer(project_file, main_file, predicate)
     r.run()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
