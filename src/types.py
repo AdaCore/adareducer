@@ -6,11 +6,17 @@ class SLOC(object):
         self.line = line
         self.column = column
 
+    def __str__(self):
+        return f"{self.line}:{self.column}"
+
 
 class SLOC_Range(object):
     def __init__(self, sloc_start, sloc_end):
         self.start = sloc_start
         self.end = sloc_end
+
+    def __str__(self):
+        return f"{self.start}-{self.end}"
 
 
 def replace(lines, sloc_range, new_lines):
@@ -22,10 +28,12 @@ def replace(lines, sloc_range, new_lines):
 
        to ease undoing the replace"""
 
-    # Deal with the first line
-    first_bit = lines[sloc_range.start.line][0 : sloc_range.start.column - 1]
-    last_bit = lines[sloc_range.end.line][sloc_range.end.column - 1 :]
-    if sloc_range.start.line == sloc_range.end.line:
+    # cut
+    text = (
+        lines[sloc_range.start.line][0 : sloc_range.start.column - 1]
+        + lines[sloc_range.end.line][sloc_range.end.column - 1 :]
+    )
+    if sloc_range.end.line == sloc_range.start.line:
         result = [
             lines[sloc_range.start.line][
                 sloc_range.start.column - 1 : sloc_range.end.column - 1
@@ -33,26 +41,33 @@ def replace(lines, sloc_range, new_lines):
         ]
     else:
         result = [lines[sloc_range.start.line][sloc_range.start.column - 1 :]]
-    lines[sloc_range.start.line] = first_bit + new_lines[0]
+        for j in range(sloc_range.start.line + 1, sloc_range.end.line):
+            result.append(lines[j])
+        result.append(lines[sloc_range.end.line][0 : sloc_range.end.column - 1])
+        for j in range(sloc_range.end.line - sloc_range.start.line):
+            lines.pop(sloc_range.start.line)
 
-    # Middle bit
-    # Pop all the existing lines into result
-    for _ in range(1, sloc_range.end.line - sloc_range.start.line - 1):
-        result.append(lines.pop(sloc_range.start.line + 1))
+    lines[sloc_range.start.line] = text
 
-    # Insert all the lines
-    for r in range(1, len(new_lines) - 1):
-        lines.insert(sloc_range.start.line + r - 1, new_lines[r])
-
-    # End bit
-
-    lastline = sloc_range.start.line + len(new_lines) - 1
-
-    if sloc_range.start.line == sloc_range.end.line:
-        lines[sloc_range.start.line] = lines[sloc_range.start.line] + last_bit
+    # insert new text
+    if len(new_lines) == 0:
+        pass
+    elif len(new_lines) == 1:
+        lines[sloc_range.start.line] = (
+            lines[sloc_range.start.line][0 : sloc_range.start.column - 1]
+            + new_lines[0]
+            + lines[sloc_range.start.line][sloc_range.start.column - 1 :]
+        )
     else:
-        result.append(lines[lastline][0 : sloc_range.end.column - 1])
-        lines[lastline] = new_lines[-1] + last_bit
+        end_bit = lines[sloc_range.start.line][sloc_range.start.column - 1 :]
+        lines[sloc_range.start.line] = (
+            lines[sloc_range.start.line][0 : sloc_range.start.column - 1] + new_lines[0]
+        )
+        for j in range(1, len(new_lines) - 1):
+            lines.insert(sloc_range.start.line + j, new_lines[j])
+        lines.insert(
+            sloc_range.start.line + len(new_lines) - 1, new_lines[-1] + end_bit
+        )
 
     if len(new_lines) == 1:
         end_sloc = SLOC(

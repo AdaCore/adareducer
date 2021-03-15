@@ -2,7 +2,8 @@ def dichotomize(chunks, predicate):
     """Apply dichotomy for actionable chunks.
        Return the chunks which cannot be applied
     """
-
+    # Assume chunks are ordered and process them in
+    # reverse order
     for chunk in chunks:
         chunk.do()
 

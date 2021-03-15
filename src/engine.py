@@ -21,22 +21,55 @@ class HollowBody(ChunkInterface):
         self.node = node
         self.statements_lines = None
         self.statements_range = None
+        self.decl_range = None
+        self.decl_lines = None
 
     def do(self):
         spec = self.node.find(lal.SubpSpec)
         is_procedure = spec.children[0].is_a(lal.SubpKindProcedure)
 
-        # self.decl = node.find(lal.DeclarativePart).find(lal.AdaNodeList)
-        # self.decl_text = self.decl.text.splitlines()
-
-        self.statements = self.node.find(lal.HandledStmts).find(lal.StmtList)
+        decl = self.node.find(lal.DeclarativePart).find(lal.AdaNodeList)
+        statements = self.node.find(lal.HandledStmts).find(lal.StmtList)
 
         if is_procedure:
-            self.statements_range, self.statements_lines = replace(
-                self.lines, self.statements.sloc_range, ["null;"]
+            # For procedures, we replace the body with a "null;" statement
+            # plus
+            body_replacement = ["null;"]
+        else:
+            # For functions, we need to craft a "return" statement to preserve
+            # compilability
+            self_name = self.node.find(lal.DefiningName).text
+            params = spec.find(lal.ParamSpecList)
+            if params:
+                pms = []
+                for j in params.children:
+                    pms.append(j.find(lal.DefiningName).text)
+                param_words = ", ".join(pms)
+                body_replacement = [f"return {self_name} ({param_words});"]
+            else:
+                body_replacement = [f"return {self_name};"]
+
+        # Add enough empty lines to preserve line numbers
+        body_replacement += [""] * (
+            statements.sloc_range.end.line - statements.sloc_range.start.line
+        )
+
+        # Replace the body
+        self.statements_range, self.statements_lines = replace(
+            self.lines, statements.sloc_range, body_replacement
+        )
+
+        # Replace the declarative part if it's non-empty
+        if decl.sloc_range.end.line != decl.sloc_range.start.line:
+            self.decl_range, self.decl_lines = replace(
+                self.lines,
+                decl.sloc_range,
+                [""] * (decl.sloc_range.end.line - decl.sloc_range.start.line + 1),
             )
 
     def undo(self):
+        if self.decl_range is not None:
+            _, l = replace(self.lines, self.decl_range, self.decl_lines)
         if self.statements_range is not None:
             replace(self.lines, self.statements_range, self.statements_lines)
 
@@ -79,6 +112,7 @@ class Reducer(object):
             cmd = [self.script]
 
         out = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
         return out.returncode == 0
 
     def run(self):
@@ -114,5 +148,6 @@ class Reducer(object):
         strategy = HollowOutSubprograms()
         strategy.run_on_file(unit, lines, predicate)
 
+        write_file(file, lines)
         print(f"done reducing {file}")
         # TODO: after reducing the file, reduce its dependencies
