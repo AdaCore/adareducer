@@ -4,7 +4,7 @@ def dichotomize(chunks, predicate):
     """
     # Assume chunks are ordered and process them in
     # reverse order
-    for chunk in chunks:
+    for chunk in reversed(chunks):
         chunk.do()
 
     if predicate():

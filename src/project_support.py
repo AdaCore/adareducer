@@ -10,7 +10,7 @@ class ProjectResolver(object):
 
         # Use gprls to find the list of files in the project
         # TODO: replace this whole thing with the python gpr2 API
-
+        print(project_file)
         out = subprocess.run(
             ["gprls", "-P", project_file, "-s"], stdout=subprocess.PIPE
         )

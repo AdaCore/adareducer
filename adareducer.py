@@ -1,5 +1,6 @@
 import click
 from src import engine
+from src import gui
 import os
 
 
@@ -27,8 +28,7 @@ def main(project_file, main_file, predicate):
         return
 
     r = engine.Reducer(project_file, main_file, predicate)
-    r.run()
-
+    gui.GUI.run(r)
 
 if __name__ == "__main__":
     main()

@@ -28,6 +28,8 @@ def replace(lines, sloc_range, new_lines):
 
        to ease undoing the replace"""
 
+    initial_len = len(lines)
+
     # cut
     text = (
         lines[sloc_range.start.line][0 : sloc_range.start.column - 1]
@@ -78,6 +80,7 @@ def replace(lines, sloc_range, new_lines):
             sloc_range.start.line + len(new_lines) - 1, len(new_lines[-1]) + 1
         )
 
+    assert len(lines) == initial_len
     return (SLOC_Range(sloc_range.start, end_sloc), result)
 
 

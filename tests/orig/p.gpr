@@ -1,0 +1,6 @@
+project P is
+
+   for Main use ("proc.adb") & project'Main;
+
+end P;
+

@@ -5,7 +5,7 @@ from src.types import replace, read_file, write_file
 from src.project_support import ProjectResolver
 from src.interfaces import ChunkInterface, StrategyInterface
 from src.dichotomy import dichotomize
-
+from src.gui import print
 
 class StrategyStats(object):
     def __init__(self, characters_removed, time):
@@ -104,23 +104,25 @@ class Reducer(object):
         if not os.path.isabs(main_file):
             self.main_file = self.resolver.find(main_file)
 
-    def run_predicate(self):
-        """Run predicate and return True iff predicate returned 0"""
+    def run_predicate(self, print_if_error=False):
+        """Run predicate and return True iff predicate returned 0."""
         if self.script.endswith(".sh"):
             cmd = ["bash", self.script]
         else:
             cmd = [self.script]
 
         out = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-        return out.returncode == 0
+        status = out.returncode == 0
+        if print_if_error and not status:
+            print(out.stdout.decode() + "\n" + out.stderr.decode())
+        return status
 
     def run(self):
         """Run self: reduce the project as much as possible"""
 
         # Before running any modification, run the predicate,
         # as a sanity check.
-        if not self.run_predicate():
+        if not self.run_predicate(True):
             print("The predicate returned nonzero")
             return
 
@@ -133,7 +135,6 @@ class Reducer(object):
         print(f"reducing {file}...")
 
         # Save the file to an '.orig' copy
-
         lines = read_file(file)
         write_file(file + ".orig", lines)
 
@@ -147,6 +148,14 @@ class Reducer(object):
 
         strategy = HollowOutSubprograms()
         strategy.run_on_file(unit, lines, predicate)
+
+        # Next remove the imports that we can remove
+
+        # TODO
+
+        # Move on to other files to redude
+
+        # TODO
 
         write_file(file, lines)
         print(f"done reducing {file}")
