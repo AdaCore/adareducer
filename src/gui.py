@@ -1,13 +1,24 @@
 from curses import wrapper
 
-class Window(object):
+debug = False
+debug = True
 
+
+class Window(object):
     def __init__(self):
-        pass
+        self.characters_removed = 0
 
     def run(self, engine):
         self.engine = engine
-        wrapper(self.main)
+        if debug:
+            self.engine.run()
+        else:
+            wrapper(self.main)
+
+    def add_chars_removed(self, count):
+        """Tell the gui that count characters have been removed"""
+        self.characters_removed += count
+        self.log(f"Total characters removed: {self.characters_removed}")
 
     def main(self, stdscr):
         self.scr = stdscr
@@ -15,13 +26,17 @@ class Window(object):
 
         self.engine.run()
         self.scr.refresh()
-        
-        self.scr.addstr(0,0, self.scr.getkey())
+        self.scr.getkey()
 
-    def print(self, msg):
-        self.scr.addstr(0, 0, msg)
+    def log(self, msg):
+        if debug:
+            print(msg)
+        else:
+            self.scr.addstr(0, 0, str(msg))
+
 
 GUI = Window()
 
-def print(msg):
-    GUI.print(msg)
+
+def log(msg):
+    GUI.log(msg)

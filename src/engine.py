@@ -1,11 +1,12 @@
 import subprocess
 import os
 import libadalang as lal
-from src.types import replace, read_file, write_file
+from src.types import replace, read_file, write_file, count_chars
 from src.project_support import ProjectResolver
 from src.interfaces import ChunkInterface, StrategyInterface
-from src.dichotomy import dichotomize
-from src.gui import print
+from src.dichotomy import dichotomize, to_tree, dichototree
+from src.gui import log, GUI
+
 
 class StrategyStats(object):
     def __init__(self, characters_removed, time):
@@ -19,18 +20,18 @@ class HollowBody(ChunkInterface):
         self.unit = unit
         self.lines = lines
         self.node = node
+
+        self.spec = self.node.find(lal.SubpSpec)
+        self.decl = self.node.find(lal.DeclarativePart).find(lal.AdaNodeList)
+        self.statements = self.node.find(lal.HandledStmts).find(lal.StmtList)
+
         self.statements_lines = None
         self.statements_range = None
         self.decl_range = None
         self.decl_lines = None
 
     def do(self):
-        spec = self.node.find(lal.SubpSpec)
-        is_procedure = spec.children[0].is_a(lal.SubpKindProcedure)
-
-        decl = self.node.find(lal.DeclarativePart).find(lal.AdaNodeList)
-        statements = self.node.find(lal.HandledStmts).find(lal.StmtList)
-
+        is_procedure = self.spec.children[0].is_a(lal.SubpKindProcedure)
         if is_procedure:
             # For procedures, we replace the body with a "null;" statement
             # plus
@@ -39,7 +40,7 @@ class HollowBody(ChunkInterface):
             # For functions, we need to craft a "return" statement to preserve
             # compilability
             self_name = self.node.find(lal.DefiningName).text
-            params = spec.find(lal.ParamSpecList)
+            params = self.spec.find(lal.ParamSpecList)
             if params:
                 pms = []
                 for j in params.children:
@@ -51,20 +52,21 @@ class HollowBody(ChunkInterface):
 
         # Add enough empty lines to preserve line numbers
         body_replacement += [""] * (
-            statements.sloc_range.end.line - statements.sloc_range.start.line
+            self.statements.sloc_range.end.line - self.statements.sloc_range.start.line
         )
 
         # Replace the body
         self.statements_range, self.statements_lines = replace(
-            self.lines, statements.sloc_range, body_replacement
+            self.lines, self.statements.sloc_range, body_replacement
         )
 
         # Replace the declarative part if it's non-empty
-        if decl.sloc_range.end.line != decl.sloc_range.start.line:
+        if self.decl.sloc_range.end.line != self.decl.sloc_range.start.line:
             self.decl_range, self.decl_lines = replace(
                 self.lines,
-                decl.sloc_range,
-                [""] * (decl.sloc_range.end.line - decl.sloc_range.start.line + 1),
+                self.decl.sloc_range,
+                [""]
+                * (self.decl.sloc_range.end.line - self.decl.sloc_range.start.line + 1),
             )
 
     def undo(self):
@@ -72,6 +74,19 @@ class HollowBody(ChunkInterface):
             _, l = replace(self.lines, self.decl_range, self.decl_lines)
         if self.statements_range is not None:
             replace(self.lines, self.statements_range, self.statements_lines)
+
+    def is_in(self, other):
+        def infer_or_equal(a, b):
+            if a.line < b.line:
+                return True
+            elif a.line > b.line:
+                return False
+            else:
+                return a.column <= b.column
+
+        return infer_or_equal(
+            other.node.sloc_range.start, self.node.sloc_range.start
+        ) and infer_or_equal(self.node.sloc_range.end, other.node.sloc_range.end)
 
 
 class HollowOutSubprograms(StrategyInterface):
@@ -88,8 +103,68 @@ class HollowOutSubprograms(StrategyInterface):
             # Hollow out the bodies
             chunks.append(HollowBody(unit, lines, subp))
 
-        not_processed = dichotomize(chunks, predicate)
-        return not_processed
+        # Order the chunks to make sure that nesting edits don't block each other
+        chunks.sort(key=lambda c: c.decl.sloc_range.start.line)
+
+        t = to_tree(chunks)
+        return dichototree(t, predicate)
+
+
+class RemoveStatement(ChunkInterface):
+    def __init__(self, node, lines, is_lone):
+        self.node = node
+        self.is_lone = is_lone
+        self.lines = lines
+
+    def do(self):
+        num_lines = self.node.sloc_range.end.line - self.node.sloc_range.start.line + 1
+        new_text = ["null;"] + [""] * (num_lines - 1)
+        self.range, self.new_lines = replace(self.lines, self.node.sloc_range, new_text)
+
+    def undo(self):
+        replace(self.lines, self.range, self.new_lines)
+
+    def __str__(self):
+        return f"remove {self.node.sloc_range}"
+
+    def is_in(self, other):
+        def infer_or_equal(a, b):
+            if a.line < b.line:
+                return True
+            elif a.line > b.line:
+                return False
+            else:
+                return a.column <= b.column
+
+        return infer_or_equal(
+            other.node.sloc_range.start, self.node.sloc_range.start
+        ) and infer_or_equal(self.node.sloc_range.end, other.node.sloc_range.end)
+
+
+class RemoveStatements(StrategyInterface):
+    """This strategy removes statements from bodies of subprograms"""
+
+    def run_on_file(self, unit, lines, predicate):
+        """subps_to_try contains the list of subp nodes to try"""
+
+        chunks = []
+        for subp in unit.root.findall(lambda x: x.is_a(lal.SubpBody)):
+            # Find all statement lists
+            stmtlists = subp.findall(lambda x: x.is_a(lal.StmtList))
+            for stmtlist in stmtlists:
+                children = stmtlist.children
+                for stmt in children:
+                    chunks.append(
+                        RemoveStatement(stmt, lines, is_lone=len(children) <= 1)
+                    )
+
+        # Order the chunks
+        chunks.sort(key=lambda c: c.node.sloc_range.start.line)
+
+        t = to_tree(chunks)
+
+        # Do the work
+        return dichototree(t, predicate)
 
 
 class Reducer(object):
@@ -114,7 +189,7 @@ class Reducer(object):
         out = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         status = out.returncode == 0
         if print_if_error and not status:
-            print(out.stdout.decode() + "\n" + out.stderr.decode())
+            log(out.stdout.decode() + "\n" + out.stderr.decode())
         return status
 
     def run(self):
@@ -123,7 +198,7 @@ class Reducer(object):
         # Before running any modification, run the predicate,
         # as a sanity check.
         if not self.run_predicate(True):
-            print("The predicate returned nonzero")
+            log("The predicate returned nonzero")
             return
 
         # We've passed the sanity check, time to reduce!
@@ -132,11 +207,12 @@ class Reducer(object):
     def reduce_file(self, file):
         """Reduce one given file as much as possible"""
 
-        print(f"reducing {file}...")
-
         # Save the file to an '.orig' copy
         lines = read_file(file)
         write_file(file + ".orig", lines)
+
+        count = count_chars(lines)
+        log(f"reducing {file} ({count} characters)")
 
         # First remove the bodies of procedures
 
@@ -149,6 +225,16 @@ class Reducer(object):
         strategy = HollowOutSubprograms()
         strategy.run_on_file(unit, lines, predicate)
 
+        # If there are bodies left, remove statements from them
+
+        unit = self.context.get_from_file(file, reparse=True)
+        strategy = RemoveStatements()
+        strategy.run_on_file(unit, lines, predicate)
+
+        # Remove subprograms
+
+        # TODO
+
         # Next remove the imports that we can remove
 
         # TODO
@@ -158,5 +244,7 @@ class Reducer(object):
         # TODO
 
         write_file(file, lines)
-        print(f"done reducing {file}")
+        chars_removed = count - count_chars(lines)
+        GUI.add_chars_removed(chars_removed)
+        log(f"done reducing {file} ({chars_removed} characters removed)")
         # TODO: after reducing the file, reduce its dependencies

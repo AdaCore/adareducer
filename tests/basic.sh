@@ -1,3 +1,3 @@
 cd /tmp/_adareducer_test && \
-gprbuild -q -Pp.gpr && \
+gprbuild -f -q -Pp.gpr && \
 ./proc | grep "hello"

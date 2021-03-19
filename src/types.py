@@ -97,3 +97,11 @@ def write_file(file, lines):
     """ Write buffer to file from its line array, popping the one at first"""
     with open(file, "w") as f:
         f.write("\n".join(lines[1:]) + "\n")
+
+
+def count_chars(lines):
+    """ Count the characters in lines """
+    count = 0
+    for l in lines[1:]:
+        count += len(l)
+    return count
