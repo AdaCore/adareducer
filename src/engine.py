@@ -9,6 +9,7 @@ from src.gui import log, GUI
 from src.hollow_body import HollowOutSubprograms
 from src.remove_statement import RemoveStatements
 from src.remove_subprograms import RemoveSubprograms
+from src.remove_imports import RemoveImports
 
 
 class StrategyStats(object):
@@ -92,7 +93,10 @@ class Reducer(object):
 
         # Next remove the imports that we can remove
 
-        # TODO
+        log("=> Removing imports")
+
+        strategy = RemoveImports()
+        strategy.run_on_file(self.context, file, self.run_predicate)
 
         # Move on to other files to reduce
 
