@@ -19,6 +19,38 @@ class SLOC_Range(object):
         return f"{self.start}-{self.end}"
 
 
+class Buffer(object):
+    """Represents the contents of a file"""
+
+    def __init__(self, filename):
+        """Reads the buffer from disk"""
+        self.filename = filename
+        self.lines = []
+        # a list containing None plus the text of the file
+
+        self.load()
+
+    def load(self):
+        """ Return the contents of file as an array of lines, with
+            an extra empty one at the top so that line numbers correspond
+            to indexes
+        """
+        with open(self.filename, "rb") as f:
+            self.lines = [None] + f.read().decode().splitlines()
+
+    def save(self, to_file=None):
+        """ Write buffer to file from its line array, popping the one at first"""
+        with open(to_file if to_file is not None else self.filename, "w") as f:
+            f.write("\n".join(self.lines[1:]) + "\n")
+
+    def replace(self, sloc_range, new_lines):
+        """See below"""
+        return replace(self.lines, sloc_range, new_lines)
+
+    def count_chars(self):
+        return count_chars(self.lines)
+
+
 def replace(lines, sloc_range, new_lines):
     """ Replace text at the given range with the new lines.
 
@@ -84,24 +116,18 @@ def replace(lines, sloc_range, new_lines):
     return (SLOC_Range(sloc_range.start, end_sloc), result)
 
 
-def read_file(file):
-    """ Return the contents of file as an array of lines, with
-        an extra empty one at the top so that line numbers correspond
-        to indexes
-    """
-    with open(file, "rb") as f:
-        return [None] + f.read().decode().splitlines()
-
-
-def write_file(file, lines):
-    """ Write buffer to file from its line array, popping the one at first"""
-    with open(file, "w") as f:
-        f.write("\n".join(lines[1:]) + "\n")
-
-
 def count_chars(lines):
     """ Count the characters in lines """
     count = 0
     for l in lines[1:]:
         count += len(l)
     return count
+
+def infer_or_equal(a, b):
+    """compare two sloc ranges"""
+    if a.line < b.line:
+        return True
+    elif a.line > b.line:
+        return False
+    else:
+        return a.column <= b.column

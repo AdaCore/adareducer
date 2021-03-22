@@ -1,3 +1,6 @@
+from src.gui import log
+
+
 def dichotomize(chunks, predicate):
     """Apply dichotomy for actionable chunks
     .
@@ -16,12 +19,10 @@ def dichotomize(chunks, predicate):
     if predicate():
         # Yay! all chunks could be actioned
         return (chunks, [])
-
-    if not predicate():
+    else:
         # Not all chunks could not be actioned...
         for chunk in chunks:
             chunk.undo()
-
         if len(chunks) <= 1:
             # We've dichotomized as much as we could.
             return ([], chunks)
@@ -82,10 +83,18 @@ def dichototree(chunks_tree, predicate):
        then descending the exploration as levels fail.
     """
     to_test = list(chunks_tree.children)
+    level = 0
     while to_test:
-        _, not_actioned = dichotomize(to_test, predicate)
+        level += 1
+        actioned, not_actioned = dichotomize(to_test, predicate)
+        log(
+            f"{level * ' '} level {level}: {len(actioned)} actioned, "
+            + f"{len(not_actioned)} not actioned"
+        )
         to_test = []
 
         for x in not_actioned:
             for c in x.children:
                 to_test.append(c)
+
+    predicate()

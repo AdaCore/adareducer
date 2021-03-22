@@ -21,6 +21,8 @@ procedure proc is
    end Nested;
 
    procedure C is
+      procedure Nested;
+
       procedure Nested is
          procedure A is
             C : Integer := 42;
