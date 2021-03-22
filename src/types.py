@@ -123,6 +123,7 @@ def count_chars(lines):
         count += len(l)
     return count
 
+
 def infer_or_equal(a, b):
     """compare two sloc ranges"""
     if a.line < b.line:
