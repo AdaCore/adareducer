@@ -1,6 +1,7 @@
 import subprocess
 import os
 import libadalang as lal
+
 from src.types import Buffer
 from src.project_support import ProjectResolver
 from src.gui import log, GUI
@@ -16,7 +17,8 @@ from src.remove_trivias import RemoveTrivias
 #   - remove successive null statements
 #   - empty bodies first
 #   - remove body files when they are empty
-#   - transform "to reduce" set in a round robin ordered list
+#   - use a python API for .gpr
+#   - support non-gnat naming schemes?
 
 
 class StrategyStats(object):
@@ -35,7 +37,7 @@ class Reducer(object):
         self.context = lal.AnalysisContext(unit_provider=unit_provider)
         self.main_file = main_file
 
-        self.files_to_reduce = set()  # Files to reduce
+        self.files_to_reduce = []  # Files to reduce
         self.files_reduced = set()  # Files already reduced
 
         if not os.path.isabs(main_file):
@@ -65,14 +67,33 @@ class Reducer(object):
 
         # We've passed the sanity check, time to reduce!
 
-        self.files_to_reduce.add(self.main_file)
+        # Prepare the list of files to reduce. First the main file...
+        self.files_to_reduce.append(self.main_file)
+
+        # ... then all the bodies
+        for x in self.resolver.files:
+            if x.endswith(".adb"):
+                self.files_to_reduce.append(self.resolver.files[x])
+        # ... then all the specs
+        for x in self.resolver.files:
+            if x.endswith(".ads"):
+                self.files_to_reduce.append(self.resolver.files[x])
 
         while len(self.files_to_reduce) > 0:
-            currently_reducing = self.files_to_reduce.pop()
+            currently_reducing = self.files_to_reduce[0]
+            self.files_to_reduce = self.files_to_reduce[1:]
             self.reduce_file(currently_reducing)
+
+    def schedule(self, candidate_filename):
+        """Schedule candidate_filename for reduction"""
+        if candidate_filename not in self.files_reduced and candidate_filename not in self.files_to_reduce:
+            self.files_to_reduce.append(candidate_filename)
 
     def reduce_file(self, file):
         """Reduce one given file as much as possible"""
+
+        if file in self.files_to_reduce:
+            self.files_to_reduce.remove(file)
 
         # Skip some cases
         if "rts-" in file:
@@ -117,7 +138,6 @@ class Reducer(object):
         # If there are bodies left, remove statements from them
 
         log("=> Emptying out bodies (statement by statement)")
-
         unit = self.context.get_from_file(file, reparse=True)
         strategy = RemoveStatements()
         strategy.run_on_file(unit, buf.lines, predicate)
@@ -125,14 +145,12 @@ class Reducer(object):
         # Remove subprograms
 
         log("=> Removing subprograms")
-
         strategy = RemoveSubprograms()
         strategy.run_on_file(self.context, file, self.run_predicate)
 
         # Next remove the imports that we can remove
 
         log("=> Removing imports")
-
         strategy = RemoveImports()
         strategy.run_on_file(self.context, file, self.run_predicate)
 
@@ -152,7 +170,7 @@ class Reducer(object):
         # Is this file finished?
         # As long as we have removed something, don't give up
         if chars_removed > 0:
-            self.files_to_reduce.add(file)
+            self.files_to_reduce.append(file)
         else:
             self.files_reduced.add(file)
 
@@ -166,14 +184,10 @@ class Reducer(object):
             package = unit.root.find(lal.LibraryItem).find(lal.PackageBody)
         if package is not None:
             decl = package.children[0].p_canonical_part()
-            candidate_filename = decl.unit.filename
-            if candidate_filename not in self.files_reduced:
-                self.files_to_reduce.add(candidate_filename)
+            self.schedule(decl.unit.filename)
             next = decl.p_next_part()
             while next is not None and next != decl:
-                candidate_filename = next.unit.filename
-                if candidate_filename not in self.files_reduced:
-                    self.files_to_reduce.add(candidate_filename)
+                self.schedule(next.unit.filename)
                 decl = next
                 next = next.p_next_part()
 
@@ -185,6 +199,4 @@ class Reducer(object):
                 id = ids[-1]
                 decl = id.p_referenced_defining_name()
                 if decl is not None:
-                    candidate_filename = decl.unit.filename
-                    if candidate_filename not in self.files_reduced:
-                        self.files_to_reduce.add(candidate_filename)
+                    self.schedule(decl.unit.filename)
