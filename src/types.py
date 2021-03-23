@@ -120,7 +120,7 @@ def count_chars(lines):
     """ Count the characters in lines """
     count = 0
     for l in lines[1:]:
-        count += len(l)
+        count += len(l) + 1  # The + 1 is the line terminator
     return count
 
 

@@ -10,6 +10,13 @@ from src.hollow_body import HollowOutSubprograms
 from src.remove_statement import RemoveStatements
 from src.remove_subprograms import RemoveSubprograms
 from src.remove_imports import RemoveImports
+from src.remove_trivias import RemoveTrivias
+
+# TODO:
+#   - remove successive null statements
+#   - empty bodies first
+#   - remove body files when they are empty
+#   - transform "to reduce" set in a round robin ordered list
 
 
 class StrategyStats(object):
@@ -62,7 +69,6 @@ class Reducer(object):
 
         while len(self.files_to_reduce) > 0:
             currently_reducing = self.files_to_reduce.pop()
-            self.files_reduced.add(currently_reducing)
             self.reduce_file(currently_reducing)
 
     def reduce_file(self, file):
@@ -71,9 +77,11 @@ class Reducer(object):
         # Skip some cases
         if "rts-" in file:
             log(f"SKIPPING {file}: looks like a runtime file")
+            self.files_reduced.add(file)
             return
         if not os.access(file, os.W_OK):
             log(f"SKIPPING {file}: not writable")
+            self.files_reduced.add(file)
             return
 
         # Save the file to an '.orig' copy
@@ -95,7 +103,6 @@ class Reducer(object):
                     filename = body.unit.filename
                     if filename not in self.files_reduced:
                         log("=> Reducing the body first")
-                        self.files_reduced.add(filename)
                         self.reduce_file(filename)
 
         def predicate():
@@ -129,12 +136,25 @@ class Reducer(object):
         strategy = RemoveImports()
         strategy.run_on_file(self.context, file, self.run_predicate)
 
+        # Remove trivias
+
+        log("=> Removing blank lines and comments")
+        strategy = RemoveTrivias()
+        strategy.run_on_file(file, self.run_predicate)
+
         # Print some stats
 
         buf = Buffer(file)
         chars_removed = count - buf.count_chars()
         GUI.add_chars_removed(chars_removed)
         log(f"done reducing {file} ({chars_removed} characters removed)")
+
+        # Is this file finished?
+        # As long as we have removed something, don't give up
+        if chars_removed > 0:
+            self.files_to_reduce.add(file)
+        else:
+            self.files_reduced.add(file)
 
         # Move on to the next files
 
