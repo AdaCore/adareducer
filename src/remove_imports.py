@@ -3,8 +3,6 @@ from src.types import Buffer
 from src.interfaces import ChunkInterface, StrategyInterface
 from src.dichotomy import dichotomize
 
-from src.gui import log
-
 
 class RemoveClause(ChunkInterface):
     def __init__(self, buffer, node):

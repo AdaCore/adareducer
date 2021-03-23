@@ -27,6 +27,10 @@ class Reducer(object):
         unit_provider = lal.UnitProvider.for_project(os.path.abspath(project_file))
         self.context = lal.AnalysisContext(unit_provider=unit_provider)
         self.main_file = main_file
+
+        self.files_to_reduce = set()  # Files to reduce
+        self.files_reduced = set()  # Files already reduced
+
         if not os.path.isabs(main_file):
             self.main_file = self.resolver.find(main_file)
 
@@ -53,10 +57,24 @@ class Reducer(object):
             return
 
         # We've passed the sanity check, time to reduce!
-        self.reduce_file(self.main_file)
+
+        self.files_to_reduce.add(self.main_file)
+
+        while len(self.files_to_reduce) > 0:
+            currently_reducing = self.files_to_reduce.pop()
+            self.files_reduced.add(currently_reducing)
+            self.reduce_file(currently_reducing)
 
     def reduce_file(self, file):
         """Reduce one given file as much as possible"""
+
+        # Skip some cases
+        if "rts-" in file:
+            log(f"SKIPPING {file}: looks like a runtime file")
+            return
+        if not os.access(file, os.W_OK):
+            log(f"SKIPPING {file}: not writable")
+            return
 
         # Save the file to an '.orig' copy
         buf = Buffer(file)
@@ -65,13 +83,26 @@ class Reducer(object):
         count = buf.count_chars()
         log(f"*** Reducing {file} ({count} characters)")
 
+        unit = self.context.get_from_file(file)
+
+        # If this is a package spec, try reducing the package body first
+        package = unit.root.find(lal.LibraryItem).find(lal.PackageDecl)
+        if package is not None:
+            decl = package.children[0].p_canonical_part()
+            if decl is not None:
+                body = decl.p_next_part()
+                if body is not None:
+                    filename = body.unit.filename
+                    if filename not in self.files_reduced:
+                        log("=> Reducing the body first")
+                        self.files_reduced.add(filename)
+                        self.reduce_file(filename)
+
         def predicate():
             buf.save()
             return self.run_predicate()
 
         log("=> Emptying out bodies (brute force)")
-
-        unit = self.context.get_from_file(file)
 
         strategy = HollowOutSubprograms()
         strategy.run_on_file(unit, buf.lines, predicate)
@@ -98,12 +129,42 @@ class Reducer(object):
         strategy = RemoveImports()
         strategy.run_on_file(self.context, file, self.run_predicate)
 
-        # Move on to other files to reduce
-
-        # TODO
+        # Print some stats
 
         buf = Buffer(file)
         chars_removed = count - buf.count_chars()
         GUI.add_chars_removed(chars_removed)
         log(f"done reducing {file} ({chars_removed} characters removed)")
-        # TODO: after reducing the file, reduce its dependencies
+
+        # Move on to the next files
+
+        unit = self.context.get_from_file(file, reparse=True)
+
+        # This finds the spec/body
+        package = unit.root.find(lal.LibraryItem).find(lal.PackageDecl)
+        if package is None:
+            package = unit.root.find(lal.LibraryItem).find(lal.PackageBody)
+        if package is not None:
+            decl = package.children[0].p_canonical_part()
+            candidate_filename = decl.unit.filename
+            if candidate_filename not in self.files_reduced:
+                self.files_to_reduce.add(candidate_filename)
+            next = decl.p_next_part()
+            while next is not None and next != decl:
+                candidate_filename = next.unit.filename
+                if candidate_filename not in self.files_reduced:
+                    self.files_to_reduce.add(candidate_filename)
+                decl = next
+                next = next.p_next_part()
+
+        # This finds all imported packages
+        for w in unit.root.findall(lambda x: x.is_a(lal.WithClause)):
+            # find the last id in w
+            ids = w.findall(lambda x: x.is_a(lal.Identifier))
+            if ids is not None:
+                id = ids[-1]
+                decl = id.p_referenced_defining_name()
+                if decl is not None:
+                    candidate_filename = decl.unit.filename
+                    if candidate_filename not in self.files_reduced:
+                        self.files_to_reduce.add(candidate_filename)
