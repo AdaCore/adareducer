@@ -7,4 +7,14 @@ package body P is
       Put_Line ("hello");
    end B;
 
+   package body Q is
+      procedure Foo2 is null;
+   end Q;
+   package body Q2 is
+      package body Q3 is
+      end Q3;
+      procedure Foo2 is null;
+   end Q2;
+
+
 end P;

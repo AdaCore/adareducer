@@ -13,12 +13,23 @@ from src.remove_statement import RemoveStatements
 from src.remove_subprograms import RemoveSubprograms
 from src.remove_imports import RemoveImports
 from src.remove_trivias import RemoveTrivias
+from src.remove_generic_nodes import RemovePackages
 
 # TODO:
 #   - remove successive null statements
-#   - empty bodies first
+#   - order the .ads for processing in leaf-first mode
 #   - use a python API for .gpr
 #   - support non-gnat naming schemes?
+#   - remove extraneous calls to predicate
+
+# Debug convenience bits
+EMPTY_OUT_BODIES_BRUTE_FORCE = False
+REMOVE_PACKAGES = False
+EMPTY_OUT_BODIES_STATEMENTS = False
+REMOVE_SUBPROGRAMS = True
+REMOVE_IMPORTS = False
+REMOVE_TRIVIAS = False
+ATTEMPT_DELETE = False
 
 
 class StrategyStats(object):
@@ -28,7 +39,7 @@ class StrategyStats(object):
 
 
 class Reducer(object):
-    def __init__(self, project_file, main_file, script, single_file):
+    def __init__(self, project_file, script, single_file=None):
         self.project_file = project_file
         self.script = script
         self.resolver = ProjectResolver(project_file)
@@ -37,13 +48,10 @@ class Reducer(object):
 
         self.unit_provider = lal.UnitProvider.for_project(os.path.abspath(project_file))
         self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
-        self.main_file = main_file
 
-        self.files_to_reduce = []  # Files to reduce
+        self.bodies_to_reduce = []  # bodies to reduce
+        self.ads_dict = None  # specs to reducse
         self.files_reduced = set()  # Files already reduced
-
-        if not os.path.isabs(main_file):
-            self.main_file = self.resolver.find(main_file)
 
     def run_predicate(self, print_if_error=False):
         """Run predicate and return True iff predicate returned 0."""
@@ -58,6 +66,83 @@ class Reducer(object):
             log(out.stdout.decode() + "\n" + out.stderr.decode())
         return status
 
+    def sort_ads_files(self):
+        """Sort .ads files into a tree structure, allowing to process
+           the leaf nodes first"""
+
+        ads_dict = {}
+        # A dict showing dependencies of als
+        # keys: full path to .ads files
+        # values: set of files that depend on this
+
+        # First, add them all
+        for x in self.resolver.files:
+            full = self.resolver.files[x]
+            if full.endswith(".ads"):
+                ads_dict[full] = set()
+
+        # Now iterate on all of them
+        total = len(ads_dict)
+        count = 0
+        for x in ads_dict:
+            count += 1
+            log(f"\t{count}/{total}: analyzing {x}")
+            unit = self.context.get_from_file(x)
+
+            # Iterate on all the use clauses
+            root = unit.root
+            if root is None:
+                log(f"??? cannot find a root node for {x}")
+            else:
+                for w in root.findall(lambda x: x.is_a(lal.WithClause)):
+                    # find the last id in w
+                    ids = w.findall(lambda x: x.is_a(lal.Identifier))
+                    if ids is not None:
+                        id = ids[-1]
+                        decl = id.p_referenced_defining_name()
+                        if decl is not None:
+                            if decl.unit.filename in ads_dict:
+                                ads_dict[decl.unit.filename].add(x)
+
+        self.ads_dict = ads_dict
+
+    def mark_as_processed(self, file):
+        """Mark file as processed"""
+
+        self.files_reduced.add(file)
+
+        if self.single_file is not None:
+            return
+
+        if file.endswith(".adb"):
+            # Remove from the list of bodies
+            self.bodies_to_reduce.remove(file)
+        else:
+            # Remove from the tree of specs
+            for x in self.ads_dict:
+                if file in self.ads_dict[x]:
+                    self.ads_dict[x].remove(file)
+            self.ads_dict.pop(file)
+
+    def next_file_to_process(self):
+        """Return the next file to process, None if we're done"""
+        if len(self.bodies_to_reduce) > 0:
+            return self.bodies_to_reduce[0]
+        else:
+            if len(self.ads_dict) == 0:
+                # We're done!
+                return None
+            else:
+                # look through all .ads files to find one on which
+                # no one depends.
+                for candidate in self.ads_dict:
+                    if len(self.ads_dict[candidate]) == 0:
+                        return candidate
+
+                # if we reach here, there might be an issue
+                log("circular dependency left over")
+                return None
+
     def run(self):
         """Run self: reduce the project as much as possible"""
 
@@ -69,49 +154,36 @@ class Reducer(object):
 
         # We've passed the sanity check, time to reduce!
 
-        # Prepare the list of files to reduce. First the main file...
-        self.files_to_reduce.append(self.main_file)
-
+        # Prepare the list of files to reduce. First the main file.
         if self.single_file:
-            self.reduce_file(self.main_file)
+            self.reduce_file(self.single_file)
             return
 
-        # ... then all the bodies
+        # Add all the bodies
         for x in self.resolver.files:
             if x.endswith(".adb"):
-                self.files_to_reduce.append(self.resolver.files[x])
-        # ... then all the specs
-        for x in self.resolver.files:
-            if x.endswith(".ads"):
-                self.files_to_reduce.append(self.resolver.files[x])
+                self.bodies_to_reduce.append(self.resolver.files[x])
 
-        while len(self.files_to_reduce) > 0:
-            currently_reducing = self.files_to_reduce[0]
-            self.files_to_reduce = self.files_to_reduce[1:]
-            self.reduce_file(currently_reducing)
+        # Add all the specs
+        self.sort_ads_files()
 
-    def schedule(self, candidate_filename):
-        """Schedule candidate_filename for reduction"""
-        if (
-            candidate_filename not in self.files_reduced
-            and candidate_filename not in self.files_to_reduce
-        ):
-            self.files_to_reduce.append(candidate_filename)
+        candidate = self.next_file_to_process()
+
+        while candidate is not None:
+            self.reduce_file(candidate)
+            candidate = self.next_file_to_process()
 
     def reduce_file(self, file):
         """Reduce one given file as much as possible"""
 
-        if file in self.files_to_reduce:
-            self.files_to_reduce.remove(file)
+        self.mark_as_processed(file)
 
         # Skip some cases
         if "rts-" in file:
             log(f"SKIPPING {file}: looks like a runtime file")
-            self.files_reduced.add(file)
             return
         if not os.access(file, os.W_OK):
             log(f"SKIPPING {file}: not writable")
-            self.files_reduced.add(file)
             return
 
         # Save the file to an '.orig' copy
@@ -124,69 +196,75 @@ class Reducer(object):
         unit = self.context.get_from_file(file)
 
         if unit is None or unit.root is None:
-            self.files_reduced.add(file)
             return
 
-        # If this is a package spec, try reducing the package body first
-        lib_item = unit.root.find(lal.LibraryItem)
-        if lib_item is not None:
-            package = lib_item.find(lal.PackageDecl)
-            if package is not None:
-                decl = package.children[0].p_canonical_part()
-                if decl is not None:
-                    body = decl.p_next_part()
-                    if body is not None:
-                        filename = body.unit.filename
-                        if filename != file and filename not in self.files_reduced:
-                            log("=> Reducing the body first")
-                            self.reduce_file(filename)
+        if EMPTY_OUT_BODIES_BRUTE_FORCE:
+            log("=> Emptying out bodies (brute force)")
 
-        def predicate():
-            buf.save()
-            return self.run_predicate()
-
-        log("=> Emptying out bodies (brute force)")
-
-        strategy = HollowOutSubprograms()
-        strategy.run_on_file(unit, buf.lines, predicate)
+            strategy = HollowOutSubprograms()
+            strategy.run_on_file(
+                unit, buf.lines, self.run_predicate, lambda: buf.save()
+            )
 
         # If there are bodies left, remove statements from them
 
-        log("=> Emptying out bodies (statement by statement)")
-        unit = self.context.get_from_file(file, reparse=True)
-        strategy = RemoveStatements()
-        strategy.run_on_file(unit, buf.lines, predicate)
+        if EMPTY_OUT_BODIES_STATEMENTS:
+            self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
+            log("=> Emptying out bodies (statement by statement)")
+            buf = Buffer(file)
+            unit = self.context.get_from_file(file)
+            strategy = RemoveStatements()
+            strategy.run_on_file(
+                unit, buf.lines, self.run_predicate, lambda: buf.save()
+            )
 
         # Remove subprograms
 
-        log("=> Removing subprograms")
-        strategy = RemoveSubprograms()
-        try:
-            strategy.run_on_file(self.context, file, self.run_predicate)
-        except lal.PropertyError:
-            # retry with a new context...
+        if REMOVE_SUBPROGRAMS:
             self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
+            log("=> Removing subprograms")
+            strategy = RemoveSubprograms()
+            try:
+                strategy.run_on_file(self.context, file, self.run_predicate)
+            except lal.PropertyError:
+                # retry with a new context...
+                self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
+                strategy.run_on_file(self.context, file, self.run_predicate)
+
+        # Let's try removing packages
+
+        if REMOVE_PACKAGES:
+            self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
+            log("=> Removing packages")
+
+            strategy = RemovePackages()
             strategy.run_on_file(self.context, file, self.run_predicate)
 
         # Next remove the imports that we can remove
 
-        log("=> Removing imports")
-        strategy = RemoveImports()
-        strategy.run_on_file(self.context, file, self.run_predicate)
+        if REMOVE_IMPORTS:
+            log("=> Removing imports")
+            strategy = RemoveImports()
+            strategy.run_on_file(self.context, file, self.run_predicate)
 
         # Remove trivias
 
-        log("=> Removing blank lines and comments")
-        strategy = RemoveTrivias()
-        strategy.run_on_file(file, self.run_predicate)
+        if REMOVE_TRIVIAS:
+            log("=> Removing blank lines and comments")
+            strategy = RemoveTrivias()
+            strategy.run_on_file(file, self.run_predicate)
 
         # Attempt to delete the file if it's empty-ish
 
-        log("=> Attempting to delete")
-        strategy = DeleteEmptyUnits()
-        deletion_successful = strategy.run_on_file(
-            self.context, file, self.run_predicate
-        )
+        deletion_successful = False
+        if ATTEMPT_DELETE:
+            log("=> Attempting to delete")
+            strategy = DeleteEmptyUnits()
+            deletion_successful = strategy.run_on_file(
+                self.context, file, self.run_predicate
+            )
+
+        # Fin
 
         if deletion_successful:
             log("   File deleted! \o/")
@@ -200,42 +278,4 @@ class Reducer(object):
         log(f"done reducing {file} ({chars_removed} characters removed)")
         GUI.add_chars_removed(chars_removed)
 
-        # Is this file finished?
-        if self.overzealous_mode and chars_removed > 0:
-            # As long as we have removed something, don't give up
-            self.files_to_reduce.append(file)
-        else:
-            self.files_reduced.add(file)
-
         # Move on to the next files
-
-        if deletion_successful:
-            return
-
-        unit = self.context.get_from_file(file, reparse=True)
-
-        # This finds the spec/body
-
-        lib_item = unit.root.find(lal.LibraryItem)
-        if lib_item is not None:
-            package = lib_item.find(lal.PackageDecl)
-            if package is None:
-                package = unit.root.find(lal.LibraryItem).find(lal.PackageBody)
-            if package is not None:
-                decl = package.children[0].p_canonical_part()
-                self.schedule(decl.unit.filename)
-                next = decl.p_next_part()
-                while next is not None and next != decl:
-                    self.schedule(next.unit.filename)
-                    decl = next
-                    next = next.p_next_part()
-
-        # This finds all imported packages
-        for w in unit.root.findall(lambda x: x.is_a(lal.WithClause)):
-            # find the last id in w
-            ids = w.findall(lambda x: x.is_a(lal.Identifier))
-            if ids is not None:
-                id = ids[-1]
-                decl = id.p_referenced_defining_name()
-                if decl is not None:
-                    self.schedule(decl.unit.filename)

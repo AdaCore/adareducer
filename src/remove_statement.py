@@ -53,7 +53,7 @@ class RemoveDecl(ChunkInterface):
 class RemoveStatements(StrategyInterface):
     """This strategy removes statements from bodies of subprograms"""
 
-    def run_on_file(self, unit, lines, predicate):
+    def run_on_file(self, unit, lines, predicate, save):
         """subps_to_try contains the list of subp nodes to try"""
 
         chunks = []
@@ -75,4 +75,4 @@ class RemoveStatements(StrategyInterface):
         t = to_tree(chunks)
 
         # Do the work
-        return dichototree(t, predicate)
+        return dichototree(t, predicate, save)

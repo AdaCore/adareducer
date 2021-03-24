@@ -21,15 +21,13 @@ class RemoveClause(ChunkInterface):
 class RemoveImports(StrategyInterface):
     """ Remove subprograms """
 
-    def pred(self):
+    def save(self):
         for file in self.buffers:
             self.buffers[file].save()
-        return self.predicate()
 
     def run_on_file(self, context, file, predicate):
         self.buffers = {file: Buffer(file)}
         self.units = {file: context.get_from_file(file)}
-        self.predicate = predicate
 
         chunks = []
 
@@ -41,6 +39,4 @@ class RemoveImports(StrategyInterface):
                 # Create a chunk for each clause
                 chunks.append(RemoveClause(self.buffers[file], node))
 
-            r = dichotomize(chunks, self.pred)
-            self.pred()
-        return r
+            dichotomize(chunks, predicate, self.save)

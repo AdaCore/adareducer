@@ -76,7 +76,7 @@ class HollowOutSubprograms(StrategyInterface):
        body of subprograms as much as possible
     """
 
-    def run_on_file(self, unit, lines, predicate):
+    def run_on_file(self, unit, lines, predicate, save):
 
         # Create some chunks of work
         chunks = []
@@ -89,4 +89,4 @@ class HollowOutSubprograms(StrategyInterface):
         chunks.sort(key=lambda c: c.decl.sloc_range.start.line)
 
         t = to_tree(chunks)
-        return dichototree(t, predicate)
+        return dichototree(t, predicate, save)

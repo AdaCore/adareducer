@@ -47,14 +47,12 @@ class RemoveSubprogram(ChunkInterface):
 class RemoveSubprograms(StrategyInterface):
     """ Remove subprograms """
 
-    def pred(self):
+    def save(self):
         for file in self.buffers:
             self.buffers[file].save()
-        return self.predicate()
 
     def run_on_file(self, context, file, predicate):
         self.context = context
-        self.predicate = predicate
 
         self.buffers = {file: Buffer(file)}
         self.units = {file: self.context.get_from_file(file)}
@@ -69,4 +67,4 @@ class RemoveSubprograms(StrategyInterface):
             chunks.append(RemoveSubprogram(file, subp, self.buffers, self.units))
 
         t = to_tree(chunks)
-        return dichototree(t, self.pred)
+        return dichototree(t, predicate, self.save)

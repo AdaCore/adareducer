@@ -1,7 +1,7 @@
 from src.gui import log
 
 
-def dichotomize(chunks, predicate):
+def dichotomize(chunks, predicate, save):
     """Apply dichotomy for actionable chunks
     .
        Return a tuple
@@ -15,6 +15,7 @@ def dichotomize(chunks, predicate):
     # in each other or modify line numbers)
     for chunk in reversed(chunks):
         chunk.do()
+    save()
 
     if predicate():
         # Yay! all chunks could be actioned
@@ -23,6 +24,7 @@ def dichotomize(chunks, predicate):
         # Not all chunks could not be actioned...
         for chunk in chunks:
             chunk.undo()
+        save()
         if len(chunks) <= 1:
             # We've dichotomized as much as we could.
             return ([], chunks)
@@ -30,8 +32,8 @@ def dichotomize(chunks, predicate):
         # We've got to dichotomize more
         mid = int(len(chunks) / 2)
 
-        actioned_l, not_actioned_l = dichotomize(chunks[0:mid], predicate)
-        actioned_r, not_actioned_r = dichotomize(chunks[mid:], predicate)
+        actioned_l, not_actioned_l = dichotomize(chunks[0:mid], predicate, save)
+        actioned_r, not_actioned_r = dichotomize(chunks[mid:], predicate, save)
 
         return (actioned_l + actioned_r, not_actioned_l + not_actioned_r)
 
@@ -78,7 +80,7 @@ def to_tree(chunks):
     return result
 
 
-def dichototree(chunks_tree, predicate):
+def dichototree(chunks_tree, predicate, save):
     """Dichotomize the tree, first attempting the topmost level,
        then descending the exploration as levels fail.
     """
@@ -86,7 +88,7 @@ def dichototree(chunks_tree, predicate):
     level = 0
     while to_test:
         level += 1
-        actioned, not_actioned = dichotomize(to_test, predicate)
+        actioned, not_actioned = dichotomize(to_test, predicate, save)
         log(
             f"{level * ' '} level {level}: {len(actioned)} actioned, "
             + f"{len(not_actioned)} not actioned"
@@ -96,5 +98,3 @@ def dichototree(chunks_tree, predicate):
         for x in not_actioned:
             for c in x.children:
                 to_test.append(c)
-
-    predicate()
