@@ -7,6 +7,7 @@ from src.project_support import ProjectResolver
 from src.gui import log, GUI
 
 # Strategies
+from src.delete_empty_units import DeleteEmptyUnits
 from src.hollow_body import HollowOutSubprograms
 from src.remove_statement import RemoveStatements
 from src.remove_subprograms import RemoveSubprograms
@@ -16,7 +17,6 @@ from src.remove_trivias import RemoveTrivias
 # TODO:
 #   - remove successive null statements
 #   - empty bodies first
-#   - remove body files when they are empty
 #   - use a python API for .gpr
 #   - support non-gnat naming schemes?
 
@@ -28,13 +28,15 @@ class StrategyStats(object):
 
 
 class Reducer(object):
-    def __init__(self, project_file, main_file, script):
+    def __init__(self, project_file, main_file, script, single_file):
         self.project_file = project_file
         self.script = script
         self.resolver = ProjectResolver(project_file)
+        self.single_file = single_file
+        self.overzealous_mode = False  # Whether to keep trying as long as we reduce
 
-        unit_provider = lal.UnitProvider.for_project(os.path.abspath(project_file))
-        self.context = lal.AnalysisContext(unit_provider=unit_provider)
+        self.unit_provider = lal.UnitProvider.for_project(os.path.abspath(project_file))
+        self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
         self.main_file = main_file
 
         self.files_to_reduce = []  # Files to reduce
@@ -70,6 +72,10 @@ class Reducer(object):
         # Prepare the list of files to reduce. First the main file...
         self.files_to_reduce.append(self.main_file)
 
+        if self.single_file:
+            self.reduce_file(self.main_file)
+            return
+
         # ... then all the bodies
         for x in self.resolver.files:
             if x.endswith(".adb"):
@@ -86,7 +92,10 @@ class Reducer(object):
 
     def schedule(self, candidate_filename):
         """Schedule candidate_filename for reduction"""
-        if candidate_filename not in self.files_reduced and candidate_filename not in self.files_to_reduce:
+        if (
+            candidate_filename not in self.files_reduced
+            and candidate_filename not in self.files_to_reduce
+        ):
             self.files_to_reduce.append(candidate_filename)
 
     def reduce_file(self, file):
@@ -114,17 +123,23 @@ class Reducer(object):
 
         unit = self.context.get_from_file(file)
 
+        if unit is None or unit.root is None:
+            self.files_reduced.add(file)
+            return
+
         # If this is a package spec, try reducing the package body first
-        package = unit.root.find(lal.LibraryItem).find(lal.PackageDecl)
-        if package is not None:
-            decl = package.children[0].p_canonical_part()
-            if decl is not None:
-                body = decl.p_next_part()
-                if body is not None:
-                    filename = body.unit.filename
-                    if filename not in self.files_reduced:
-                        log("=> Reducing the body first")
-                        self.reduce_file(filename)
+        lib_item = unit.root.find(lal.LibraryItem)
+        if lib_item is not None:
+            package = lib_item.find(lal.PackageDecl)
+            if package is not None:
+                decl = package.children[0].p_canonical_part()
+                if decl is not None:
+                    body = decl.p_next_part()
+                    if body is not None:
+                        filename = body.unit.filename
+                        if filename != file and filename not in self.files_reduced:
+                            log("=> Reducing the body first")
+                            self.reduce_file(filename)
 
         def predicate():
             buf.save()
@@ -146,7 +161,12 @@ class Reducer(object):
 
         log("=> Removing subprograms")
         strategy = RemoveSubprograms()
-        strategy.run_on_file(self.context, file, self.run_predicate)
+        try:
+            strategy.run_on_file(self.context, file, self.run_predicate)
+        except lal.PropertyError:
+            # retry with a new context...
+            self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
+            strategy.run_on_file(self.context, file, self.run_predicate)
 
         # Next remove the imports that we can remove
 
@@ -160,36 +180,55 @@ class Reducer(object):
         strategy = RemoveTrivias()
         strategy.run_on_file(file, self.run_predicate)
 
+        # Attempt to delete the file if it's empty-ish
+
+        log("=> Attempting to delete")
+        strategy = DeleteEmptyUnits()
+        deletion_successful = strategy.run_on_file(
+            self.context, file, self.run_predicate
+        )
+
+        if deletion_successful:
+            log("   File deleted! \o/")
+            chars_removed = count
+        else:
+            buf = Buffer(file)
+            chars_removed = count - buf.count_chars()
+
         # Print some stats
 
-        buf = Buffer(file)
-        chars_removed = count - buf.count_chars()
-        GUI.add_chars_removed(chars_removed)
         log(f"done reducing {file} ({chars_removed} characters removed)")
+        GUI.add_chars_removed(chars_removed)
 
         # Is this file finished?
-        # As long as we have removed something, don't give up
-        if chars_removed > 0:
+        if self.overzealous_mode and chars_removed > 0:
+            # As long as we have removed something, don't give up
             self.files_to_reduce.append(file)
         else:
             self.files_reduced.add(file)
 
         # Move on to the next files
 
+        if deletion_successful:
+            return
+
         unit = self.context.get_from_file(file, reparse=True)
 
         # This finds the spec/body
-        package = unit.root.find(lal.LibraryItem).find(lal.PackageDecl)
-        if package is None:
-            package = unit.root.find(lal.LibraryItem).find(lal.PackageBody)
-        if package is not None:
-            decl = package.children[0].p_canonical_part()
-            self.schedule(decl.unit.filename)
-            next = decl.p_next_part()
-            while next is not None and next != decl:
-                self.schedule(next.unit.filename)
-                decl = next
-                next = next.p_next_part()
+
+        lib_item = unit.root.find(lal.LibraryItem)
+        if lib_item is not None:
+            package = lib_item.find(lal.PackageDecl)
+            if package is None:
+                package = unit.root.find(lal.LibraryItem).find(lal.PackageBody)
+            if package is not None:
+                decl = package.children[0].p_canonical_part()
+                self.schedule(decl.unit.filename)
+                next = decl.p_next_part()
+                while next is not None and next != decl:
+                    self.schedule(next.unit.filename)
+                    decl = next
+                    next = next.p_next_part()
 
         # This finds all imported packages
         for w in unit.root.findall(lambda x: x.is_a(lal.WithClause)):

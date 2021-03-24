@@ -8,6 +8,7 @@ class RemoveTrivias(StrategyInterface):
     def run_on_file(self, file, predicate):
         buf = Buffer(file)
         orig = list(buf.lines)
+        last_was_null = False
 
         # strip manually
         new = [None]
@@ -15,7 +16,14 @@ class RemoveTrivias(StrategyInterface):
             stripped = line.strip()
             if stripped == "" or stripped.startswith("--"):
                 pass
+
+            elif stripped == "null;":
+                # Strip successive "null;" statements
+                if not last_was_null:
+                    new.append(line)
+                last_was_null = True
             else:
+                last_was_null = False
                 new.append(line)
 
         buf.lines = new

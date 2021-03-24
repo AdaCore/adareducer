@@ -5,11 +5,45 @@ from src.interfaces import ChunkInterface, StrategyInterface
 from src.dichotomy import to_tree, dichototree
 
 
-class RemoveSubprogram(ChunkInterface):
+class AbstractRemoveNodeExplorer(object):
+    def __init__(self, buffers):
+        self.buffers = buffers
+        self.locations_to_remove = []
+        # a list which contains
+        #  - (file, range, replacement_lines)
+
+        self.locations_removed = []
+        # a list which contains
+        #  - (file, range, replacement_lines)
+
+    def find_locations_to_remove(self):
+        """Fill self.locations_to_remove with the locations to remove, based
+           on self.node"""
+        pass
+
+    def apply(self, locations_list, to_list):
+        """Apply the changes in the given list.
+           Store the reverse changes in to_list."""
+
+        for file, range, replacement_lines in locations_list:
+            r, l = self.buffers[file].replace(range, replacement_lines)
+            to_list.append((file, r, l))
+
+    def do(self):
+        self.locations_removed = []
+        self.apply(self.locations_to_remove, self.locations_removed)
+
+    def undo(self):
+        self.locations_to_remove = []
+        self.apply(self.locations_removed, self.locations_to_remove)
+
+
+class RemoveNode(ChunkInterface):
     def __init__(self, file, node, buffers, units):
         self.file = file
         self.node = node
         self.buffers = buffers
+        self.units = units
 
         # Resolve node
         self.decl = node.p_decl_part()
@@ -62,11 +96,9 @@ class RemoveSubprograms(StrategyInterface):
         # List all subprograms in the file
 
         chunks = []
-        for subp in self.units[file].root.findall(
-            lambda x: x.is_a(lal.SubpBody) or x.is_a(lal.ExprFunction)
-        ):
+        for subp in self.units[file].root.findall(lambda x: x.is_a(lal.SubpBody)):
             # Create a chunk for each subprogram
-            chunks.append(RemoveSubprogram(file, subp, self.buffers, self.units))
+            chunks.append(RemoveNode(file, subp, self.buffers, self.units))
 
         t = to_tree(chunks)
         return dichototree(t, self.pred)
