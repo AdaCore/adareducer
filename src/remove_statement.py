@@ -58,6 +58,8 @@ class RemoveStatements(StrategyInterface):
 
         chunks = []
         # Find all statement lists and decl lists
+        if unit.root is None:
+            return
         for stmtlist in unit.root.findall(lambda x: x.is_a(lal.StmtList)):
             children = stmtlist.children
             for stmt in children:

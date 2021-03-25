@@ -16,6 +16,7 @@ from src.remove_trivias import RemoveTrivias
 from src.remove_generic_nodes import RemovePackages
 
 # TODO:
+#   - REMOVE .adbs in the order of .ads's
 #   - remove successive null statements
 #   - order the .ads for processing in leaf-first mode
 #   - use a python API for .gpr
@@ -23,13 +24,16 @@ from src.remove_generic_nodes import RemovePackages
 #   - remove extraneous calls to predicate
 
 # Debug convenience bits
-EMPTY_OUT_BODIES_BRUTE_FORCE = False
-REMOVE_PACKAGES = False
-EMPTY_OUT_BODIES_STATEMENTS = False
+EMPTY_OUT_BODIES_BRUTE_FORCE = True
+REMOVE_PACKAGES = True
+EMPTY_OUT_BODIES_STATEMENTS = True
 REMOVE_SUBPROGRAMS = True
-REMOVE_IMPORTS = False
-REMOVE_TRIVIAS = False
-ATTEMPT_DELETE = False
+REMOVE_IMPORTS = True
+REMOVE_TRIVIAS = True
+ATTEMPT_DELETE = True
+
+# In cautious mode, run the predicate after running each file as a sanity check
+CAUTIOUS_MODE = True
 
 
 class StrategyStats(object):
@@ -49,8 +53,9 @@ class Reducer(object):
         self.unit_provider = lal.UnitProvider.for_project(os.path.abspath(project_file))
         self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
 
+        self.mains_to_reduce = set()
         self.bodies_to_reduce = []  # bodies to reduce
-        self.ads_dict = None  # specs to reducse
+        self.ads_dict = None  # specs to reduce
         self.files_reduced = set()  # Files already reduced
 
     def run_predicate(self, print_if_error=False):
@@ -65,6 +70,17 @@ class Reducer(object):
         if print_if_error and not status:
             log(out.stdout.decode() + "\n" + out.stderr.decode())
         return status
+
+    def attempt_delete(self, file):
+        """attempt deletion of f"""
+        buf = Buffer(file)
+        os.remove(file)
+        if self.run_predicate():
+            log("... yay, deleted \o/")
+        else:
+            # put the file back
+            buf.save()
+            log("... didn't work.")
 
     def sort_ads_files(self):
         """Sort .ads files into a tree structure, allowing to process
@@ -93,18 +109,28 @@ class Reducer(object):
             root = unit.root
             if root is None:
                 log(f"??? cannot find a root node for {x}")
+                self.attempt_delete(x)
             else:
                 for w in root.findall(lambda x: x.is_a(lal.WithClause)):
-                    # find the last id in w
-                    ids = w.findall(lambda x: x.is_a(lal.Identifier))
-                    if ids is not None:
-                        id = ids[-1]
-                        decl = id.p_referenced_defining_name()
-                        if decl is not None:
-                            if decl.unit.filename in ads_dict:
-                                ads_dict[decl.unit.filename].add(x)
+                    if not w.children[0].is_a(lal.LimitedPresent):
+                        # find the last id in w
+                        ids = w.findall(lambda x: x.is_a(lal.Identifier))
+                        if ids is not None:
+                            id = ids[-1]
+                            decl = id.p_referenced_defining_name()
+                            if decl is not None:
+                                if decl.unit.filename in ads_dict:
+                                    ads_dict[decl.unit.filename].add(x)
 
         self.ads_dict = ads_dict
+
+        # Find all bodies that are mains, so we can process them first.
+        # TODO: migrate this to the gpr2 API when it exists.
+        # Until then, duct tape:
+        for x in self.bodies_to_reduce:
+            spec = x[:-1] + "s"
+            if spec not in self.ads_dict:
+                self.mains_to_reduce.add(x)
 
     def mark_as_processed(self, file):
         """Mark file as processed"""
@@ -115,6 +141,9 @@ class Reducer(object):
             return
 
         if file.endswith(".adb"):
+            if file in self.mains_to_reduce:
+                self.mains_to_reduce.remove(file)
+
             # Remove from the list of bodies
             self.bodies_to_reduce.remove(file)
         else:
@@ -126,22 +155,33 @@ class Reducer(object):
 
     def next_file_to_process(self):
         """Return the next file to process, None if we're done"""
-        if len(self.bodies_to_reduce) > 0:
-            return self.bodies_to_reduce[0]
-        else:
-            if len(self.ads_dict) == 0:
+        if len(self.mains_to_reduce) > 0:
+            return self.mains_to_reduce.pop()
+
+        if len(self.ads_dict) == 0:
+            if len(self.bodies_to_reduce) == 0:
                 # We're done!
                 return None
             else:
-                # look through all .ads files to find one on which
-                # no one depends.
-                for candidate in self.ads_dict:
-                    if len(self.ads_dict[candidate]) == 0:
-                        return candidate
+                return self.bodies_to_reduce[0]
+        else:
+            # look through all .ads files to find one on which
+            # no one depends.
+            for candidate in self.ads_dict:
+                if len(self.ads_dict[candidate]) == 0:
+                    # find the body corresponding to this candidate
+                    bod = candidate[:-1] + "b"
+                    if bod in self.bodies_to_reduce:
+                        return bod
+                    return candidate
+            # if we reach here, there might be an issue
+            log("circular dependency left over")
+            for c in self.ads_dict:
+                print(c)
+                for dep in self.ads_dict[c]:
+                    print(f"    {dep}")
 
-                # if we reach here, there might be an issue
-                log("circular dependency left over")
-                return None
+            return None
 
     def run(self):
         """Run self: reduce the project as much as possible"""
@@ -196,6 +236,8 @@ class Reducer(object):
         unit = self.context.get_from_file(file)
 
         if unit is None or unit.root is None:
+            log(f"??? cannot find a root node for {file}")
+            self.attempt_delete(file)
             return
 
         if EMPTY_OUT_BODIES_BRUTE_FORCE:
@@ -277,5 +319,11 @@ class Reducer(object):
 
         log(f"done reducing {file} ({chars_removed} characters removed)")
         GUI.add_chars_removed(chars_removed)
+
+        # Cautious?
+
+        if CAUTIOUS_MODE:
+            if not self.run_predicate():
+                raise ("a fuss")
 
         # Move on to the next files

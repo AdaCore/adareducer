@@ -26,6 +26,8 @@ class AbstractRemoveNode(object):
         pass
 
     def add_location_to_replace_with_empty(self, node):
+        if node is None:
+            return
         file = node.unit.filename
         if file not in self.buffers:
             self.buffers[file] = Buffer(file)
@@ -66,7 +68,12 @@ class RemovePackage(AbstractRemoveNode):
 
     def find_locations_to_remove(self):
         self.add_location_to_replace_with_empty(self.node)
-        self.add_location_to_replace_with_empty(self.node.p_decl_part())
+        decl = self.node.p_decl_part()
+        if decl is None:
+            return
+        if decl.is_a(lal.GenericPackageInternal):
+            decl = decl.parent
+        self.add_location_to_replace_with_empty(decl)
 
 
 class RemovePackages(StrategyInterface):
@@ -82,6 +89,9 @@ class RemovePackages(StrategyInterface):
 
         self.buffers = {file: Buffer(file)}
         unit = self.context.get_from_file(file)
+
+        if unit.root is None:
+            return
 
         # List all subprograms in the file
 

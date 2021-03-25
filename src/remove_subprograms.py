@@ -6,7 +6,7 @@ from src.dichotomy import to_tree, dichototree
 
 
 class RemoveSubprogram(ChunkInterface):
-    def __init__(self, file, node, buffers, units):
+    def __init__(self, file, node, buffers):
         self.file = file
         self.node = node
         self.buffers = buffers
@@ -55,16 +55,19 @@ class RemoveSubprograms(StrategyInterface):
         self.context = context
 
         self.buffers = {file: Buffer(file)}
-        self.units = {file: self.context.get_from_file(file)}
+        unit = self.context.get_from_file(file)
+
+        if unit.root is None:
+            return
 
         # List all subprograms in the file
 
         chunks = []
-        for subp in self.units[file].root.findall(
+        for subp in unit.root.findall(
             lambda x: x.is_a(lal.SubpBody) or x.is_a(lal.ExprFunction)
         ):
             # Create a chunk for each subprogram
-            chunks.append(RemoveSubprogram(file, subp, self.buffers, self.units))
+            chunks.append(RemoveSubprogram(file, subp, self.buffers))
 
         t = to_tree(chunks)
         return dichototree(t, predicate, self.save)

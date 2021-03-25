@@ -27,7 +27,10 @@ class RemoveImports(StrategyInterface):
 
     def run_on_file(self, context, file, predicate):
         self.buffers = {file: Buffer(file)}
-        self.units = {file: context.get_from_file(file)}
+        unit = context.get_from_file(file)
+
+        if unit.root is None:
+            return
 
         chunks = []
 
@@ -35,7 +38,8 @@ class RemoveImports(StrategyInterface):
         # try with clauses
 
         for type in (lal.UsePackageClause, lal.WithClause):
-            for node in self.units[file].root.findall(lambda x: x.is_a(type)):
+
+            for node in unit.root.findall(lambda x: x.is_a(type)):
                 # Create a chunk for each clause
                 chunks.append(RemoveClause(self.buffers[file], node))
 

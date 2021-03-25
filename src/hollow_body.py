@@ -13,7 +13,11 @@ class HollowBody(ChunkInterface):
 
         self.spec = self.node.find(lal.SubpSpec)
         self.decl = self.node.find(lal.DeclarativePart).find(lal.AdaNodeList)
-        self.statements = self.node.find(lal.HandledStmts).find(lal.StmtList)
+        handled = self.node.find(lal.HandledStmts)
+        if handled is not None:
+            self.statements = handled.find(lal.StmtList)
+        else:
+            self.statements = None
 
         self.statements_lines = None
         self.statements_range = None
@@ -21,6 +25,8 @@ class HollowBody(ChunkInterface):
         self.decl_lines = None
 
     def do(self):
+        if not self.statements:
+            return
         is_procedure = self.spec.children[0].is_a(lal.SubpKindProcedure)
         if is_procedure:
             # For procedures, we replace the body with a "null;" statement

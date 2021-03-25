@@ -3,7 +3,7 @@ from src.gui import log
 
 def dichotomize(chunks, predicate, save):
     """Apply dichotomy for actionable chunks
-    .
+
        Return a tuple
           (chunks that could be actioned,
            chunks that could not be actioned)
