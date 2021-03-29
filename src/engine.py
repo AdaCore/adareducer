@@ -334,6 +334,14 @@ class Reducer(object):
         # Move on to the next files
 
         if self.follow_closure:
+            # First let's check if we are processing a .adb that has a .ads
+            if file.endswith(".adb"):
+                ads = file[:-1] + "s"
+                if os.path.exists(ads):
+                    # this exists, it's the natural next one to check
+                    self.ads_dict[ads] = []
+                    return
+
             self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
             unit = self.context.get_from_file(file)
             root = unit.root
