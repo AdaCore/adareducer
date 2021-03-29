@@ -1,7 +1,8 @@
+with Ada.Text_IO;
+
 package P is
 
    procedure B;
-
 
    package Q is
       procedure Foo is null;
@@ -12,4 +13,5 @@ package P is
       end Q3;
       procedure Foo is null;
    end Q2;   
+
 end P;

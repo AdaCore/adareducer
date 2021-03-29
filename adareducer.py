@@ -6,9 +6,10 @@ import os
 
 @click.command()
 @click.option("--single-file", is_flag=False)
+@click.option("--follow-closure", is_flag=True)
 @click.argument("project_file")
 @click.argument("predicate")
-def main(single_file, project_file, predicate):
+def main(single_file, follow_closure, project_file, predicate):
     """Reduces the closure of the given main file in the
        given project as long as predicate returns 0.
 
@@ -27,7 +28,7 @@ def main(single_file, project_file, predicate):
         print(f"predicate script {predicate} not found")
         return
 
-    r = engine.Reducer(project_file, predicate, single_file)
+    r = engine.Reducer(project_file, predicate, single_file, follow_closure)
     gui.GUI.run(r)
 
 

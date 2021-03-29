@@ -43,11 +43,12 @@ class StrategyStats(object):
 
 
 class Reducer(object):
-    def __init__(self, project_file, script, single_file=None):
+    def __init__(self, project_file, script, single_file=None, follow_closure=False):
         self.project_file = project_file
         self.script = script
         self.resolver = ProjectResolver(project_file)
         self.single_file = single_file
+        self.follow_closure = follow_closure
         self.overzealous_mode = False  # Whether to keep trying as long as we reduce
 
         self.unit_provider = lal.UnitProvider.for_project(os.path.abspath(project_file))
@@ -55,7 +56,7 @@ class Reducer(object):
 
         self.mains_to_reduce = set()
         self.bodies_to_reduce = []  # bodies to reduce
-        self.ads_dict = None  # specs to reduce
+        self.ads_dict = {}  # specs to reduce
         self.files_reduced = set()  # Files already reduced
 
     def run_predicate(self, print_if_error=False):
@@ -137,9 +138,6 @@ class Reducer(object):
 
         self.files_reduced.add(file)
 
-        if self.single_file is not None:
-            return
-
         if file.endswith(".adb"):
             if file in self.mains_to_reduce:
                 self.mains_to_reduce.remove(file)
@@ -196,18 +194,25 @@ class Reducer(object):
 
         # Prepare the list of files to reduce. First the main file.
         if self.single_file:
-            self.reduce_file(self.single_file)
-            return
+            candidate = self.single_file
 
-        # Add all the bodies
-        for x in self.resolver.files:
-            if x.endswith(".adb"):
-                self.bodies_to_reduce.append(self.resolver.files[x])
+            # Only add the single file
+            if candidate.endswith(".adb"):
+                self.bodies_to_reduce.append(candidate)
+            else:
+                self.ads_dict[candidate] = []
+            candidate = self.single_file
+        else:
 
-        # Add all the specs
-        self.sort_ads_files()
+            # Add all the bodies
+            for x in self.resolver.files:
+                if x.endswith(".adb"):
+                    self.bodies_to_reduce.append(self.resolver.files[x])
 
-        candidate = self.next_file_to_process()
+            # Add all the specs
+            self.sort_ads_files()
+
+            candidate = self.next_file_to_process()
 
         while candidate is not None:
             self.reduce_file(candidate)
@@ -327,3 +332,28 @@ class Reducer(object):
                 raise ("a fuss")
 
         # Move on to the next files
+
+        if self.follow_closure:
+            self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
+            unit = self.context.get_from_file(file)
+            root = unit.root
+            if root is not None:
+                # Iterate through all "with" statements
+                for w in root.findall(lambda x: x.is_a(lal.WithClause)):
+                    # find the last id in w
+                    ids = w.findall(lambda x: x.is_a(lal.Identifier))
+                    if ids is not None:
+                        id = ids[-1]
+                        decl = id.p_referenced_defining_name()
+                        # find the definition
+                        if decl is not None:
+                            file_to_add = decl.unit.filename
+                            if file_to_add.endswith(".ads"):
+                                # if it's a .ads we want to empty, empty
+                                # the .adb first, it will go faster
+                                adb = file_to_add[:-1] + "b"
+                                if os.path.exists(adb):
+                                    self.bodies_to_reduce.append(adb)
+                                self.ads_dict[file_to_add] = []
+                            else:
+                                self.bodies_to_reduce.append(file_to_add)
