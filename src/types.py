@@ -36,7 +36,15 @@ class Buffer(object):
             to indexes
         """
         with open(self.filename, "rb") as f:
-            self.lines = [None] + f.read().decode().splitlines()
+            try:
+                self.lines = [None] + f.read().decode("latin-1").splitlines()
+            except UnicodeDecodeError:
+                print(f"{self.filename}: could not decode latin-1, trying with unicode")
+                try:
+                    self.lines = [None] + f.read().decode().splitlines()
+                except UnicodeDecodeError:
+                    print("DECODE FAILED, skipping contents")
+                    self.lines = [None] + [""]
 
     def save(self, to_file=None):
         """ Write buffer to file from its line array, popping the one at first"""

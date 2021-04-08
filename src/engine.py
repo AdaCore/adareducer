@@ -231,12 +231,13 @@ class Reducer(object):
             log(f"SKIPPING {file}: not writable")
             return
 
+        log(f"*** Reducing {file}")
+
         # Save the file to an '.orig' copy
         buf = Buffer(file)
         buf.save(file + ".orig")
 
         count = buf.count_chars()
-        log(f"*** Reducing {file} ({count} characters)")
 
         unit = self.context.get_from_file(file)
 
