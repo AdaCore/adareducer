@@ -1,5 +1,6 @@
 import subprocess
 import os
+from pathlib import Path
 import glob
 
 
@@ -9,12 +10,10 @@ class ProjectResolver(object):
     def __init__(self, project_file):
         self.files = {}
         # gprls doesn't work so use something else
-        dir = os.path.dirname(project_file)
-        for x in glob.glob(f"{dir}/*.ad?"):
-            base = os.path.basename(x)
-            if not base.startswith("b__"):
-                full = os.path.join(dir, base)
-                self.files[base] = full
+        dir = Path(project_file).resolve().parent
+        for adx in dir.glob(f"**/*.ad?"):
+            if not adx.name.startswith("b__"):
+                self.files[adx.name] = str(adx)
 
     #        # Use gprls to find the list of files in the project
     #        # TODO: replace this whole thing with the python gpr2 API
