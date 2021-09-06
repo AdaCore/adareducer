@@ -13,6 +13,9 @@ class ProjectResolver(object):
         dir = Path(project_file).resolve().parent
         for adx in dir.glob(f"**/*.ad?"):
             if not adx.name.startswith("b__"):
+                assert (
+                    not adx.name in self.files
+                ), f"{adx.name} is present twice in source, ambiguous"
                 self.files[adx.name] = str(adx)
 
     #        # Use gprls to find the list of files in the project
