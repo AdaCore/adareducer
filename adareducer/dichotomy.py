@@ -1,4 +1,4 @@
-from src.gui import log
+from adareducer.gui import log
 
 
 def dichotomize(chunks, predicate, save):

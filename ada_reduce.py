@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
 import click
-from src import engine
-from src import gui
+from adareducer import engine
+from adareducer import gui
 import os
 
 

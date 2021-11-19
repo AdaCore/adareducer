@@ -1,8 +1,8 @@
 import os
 import libadalang as lal
-from src.types import Buffer, infer_or_equal
-from src.interfaces import ChunkInterface, StrategyInterface
-from src.dichotomy import to_tree, dichototree
+from adareducer.types import Buffer, infer_or_equal
+from adareducer.interfaces import ChunkInterface, StrategyInterface
+from adareducer.dichotomy import to_tree, dichototree
 
 
 class RemoveSubprogram(ChunkInterface):
