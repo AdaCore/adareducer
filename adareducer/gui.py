@@ -1,4 +1,9 @@
-from curses import wrapper
+# In some environment (e.g. Windows), this module is not disfunctional
+try:
+    from curses import wrapper
+except ModuleNotFoundError:
+    wrapper = None
+
 
 debug = False
 debug = True
@@ -10,7 +15,7 @@ class Window(object):
 
     def run(self, engine):
         self.engine = engine
-        if debug:
+        if debug or wrapper is None:
             self.engine.run()
         else:
             wrapper(self.main)

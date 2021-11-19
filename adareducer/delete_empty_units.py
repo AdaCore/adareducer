@@ -1,6 +1,6 @@
 import os
-from src.types import Buffer
-from src.interfaces import StrategyInterface
+from adareducer.types import Buffer
+from adareducer.interfaces import StrategyInterface
 
 
 class DeleteEmptyUnits(StrategyInterface):
