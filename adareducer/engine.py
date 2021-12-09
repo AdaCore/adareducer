@@ -1,5 +1,6 @@
 import subprocess
 import os
+import sys
 import libadalang as lal
 
 from adareducer.types import Buffer
@@ -34,7 +35,16 @@ ATTEMPT_DELETE = True
 
 # In cautious mode, run the predicate after running each file as a sanity check
 CAUTIOUS_MODE = True
+CAUTIOUS_MODE_HELP = """adareducer has found that the predicate no longer applies
+after completing a cycle on one file. This is unexpected.
 
+This may happen when the predicate uses a builder which looks at
+timestamps in order to check whether a file needs rebuilding: if
+the modifications happen faster than the granularity of the
+filesystem timestamps, this will fool this check.
+
+If you are using "gprbuild" in your predicate, make sure to pass "-m2".
+"""
 
 class StrategyStats(object):
     def __init__(self, characters_removed, time):
@@ -330,7 +340,8 @@ class Reducer(object):
 
         if CAUTIOUS_MODE:
             if not self.run_predicate():
-                raise ("a fuss")
+                log(CAUTIOUS_MODE_HELP)
+                sys.exit(1)
 
         # Move on to the next files
 
