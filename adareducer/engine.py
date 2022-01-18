@@ -228,27 +228,12 @@ class Reducer(object):
             self.reduce_file(candidate)
             candidate = self.next_file_to_process()
 
-    def reduce_file(self, file):
-        """Reduce one given file as much as possible"""
+    def apply_strategies_on_file(self, file, buf):
+        """Apply all the strategies on the given buf.
 
-        self.mark_as_processed(file)
-
-        # Skip some cases
-        if "rts-" in file:
-            log(f"SKIPPING {file}: looks like a runtime file")
-            return
-        if not os.access(file, os.W_OK):
-            log(f"SKIPPING {file}: not writable")
-            return
-
-        log(f"*** Reducing {file}")
-
-        # Save the file to an '.orig' copy
-        buf = Buffer(file)
-        buf.save(file + ".orig")
-
+           Return the number of characters removed.
+        """
         count = buf.count_chars()
-
         unit = self.context.get_from_file(file)
 
         if unit is None or unit.root is None:
@@ -330,6 +315,37 @@ class Reducer(object):
         else:
             buf = Buffer(file)
             chars_removed = count - buf.count_chars()
+
+        return chars_removed
+
+    def reduce_file(self, file):
+        """Reduce one given file as much as possible"""
+
+        self.mark_as_processed(file)
+
+        # Skip some cases
+        if "rts-" in file:
+            log(f"SKIPPING {file}: looks like a runtime file")
+            return
+        if not os.access(file, os.W_OK):
+            log(f"SKIPPING {file}: not writable")
+            return
+
+        log(f"*** Reducing {file}")
+
+        # Save the file to an '.orig' copy
+        buf = Buffer(file)
+        buf.save(file + ".orig")
+
+        try:
+            chars_removed = self.apply_strategies_on_file(file, buf)
+        except:
+            # Catch any exception occurring during the application of
+            # strategies, and save the buf to a .crash file, to
+            # help post-mortem analysis.
+            chars_removed = 0
+            buf.save(file + ".crash")
+            raise
 
         # Print some stats
 
