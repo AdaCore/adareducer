@@ -1,7 +1,7 @@
 set -e
 
 # Make a temporary directory
-export ADAREDUCER_TEMP_DIR=` mktemp -d`
+export ADAREDUCER_TEMP_DIR=`mktemp -d`
 
 trap \
  "{ rm -rf "${ADAREDUCER_TEMP_DIR}" ; exit 255; }" \
