@@ -239,7 +239,7 @@ class Reducer(object):
         if unit is None or unit.root is None:
             log(f"??? cannot find a root node for {file}")
             self.attempt_delete(file)
-            return
+            return 0
 
         if EMPTY_OUT_BODIES_BRUTE_FORCE:
             log("=> Emptying out bodies (brute force)")
