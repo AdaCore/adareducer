@@ -1,5 +1,6 @@
 import os
 import libadalang as lal
+from pathlib import PurePath
 
 
 class ProjectResolver(object):
@@ -12,7 +13,7 @@ class ProjectResolver(object):
         files = lal.SourceFiles.for_project(project_file)
 
         for full_path in files:
-            basename = os.path.basename(full_path)
+            basename = PurePath(full_path).name
             # For ad-hoc projects in particular, compilation artifacts
             # of the form b__* might find themselves in source dirs:
             # ignore them.
