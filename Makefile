@@ -1,2 +1,7 @@
-test:
-	bash tests/test.sh
+all: tests
+
+demonstration:
+	bash demo/test.sh
+
+tests:
+	cd testsuite ; bash run.sh

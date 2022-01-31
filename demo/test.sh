@@ -8,10 +8,10 @@ trap \
  SIGINT SIGTERM ERR
 
 # Copy the test to the temporary directory
-cp -R tests/orig/* $ADAREDUCER_TEMP_DIR
+cp -R demo/orig/* $ADAREDUCER_TEMP_DIR
 
 # Run ada_reduce.py!
-python ada_reduce.py $ADAREDUCER_TEMP_DIR/p.gpr tests/oracle.sh
+python ada_reduce.py $ADAREDUCER_TEMP_DIR/p.gpr demo/oracle.sh
 
 # Clean up
 rm -rf $ADAREDUCER_TEMP_DIR
