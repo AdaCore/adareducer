@@ -228,7 +228,7 @@ class Reducer(object):
             self.reduce_file(candidate)
             candidate = self.next_file_to_process()
 
-    def apply_strategies_on_file(self, file, buf):
+    def apply_strategies_on_file(self, file, buf) -> int:
         """Apply all the strategies on the given buf.
 
            Return the number of characters removed.
@@ -239,13 +239,12 @@ class Reducer(object):
         if unit is None or unit.root is None:
             log(f"??? cannot find a root node for {file}")
             self.attempt_delete(file)
-            return
+            return 0
 
         if EMPTY_OUT_BODIES_BRUTE_FORCE:
             log("=> Emptying out bodies (brute force)")
 
-            strategy = HollowOutSubprograms()
-            strategy.run_on_file(
+            HollowOutSubprograms().run_on_file(
                 unit, buf.lines, self.run_predicate, lambda: buf.save()
             )
 
@@ -256,8 +255,7 @@ class Reducer(object):
             log("=> Emptying out bodies (statement by statement)")
             buf = Buffer(file)
             unit = self.context.get_from_file(file)
-            strategy = RemoveStatements()
-            strategy.run_on_file(
+            RemoveStatements().run_on_file(
                 unit, buf.lines, self.run_predicate, lambda: buf.save()
             )
 
@@ -266,44 +264,38 @@ class Reducer(object):
         if REMOVE_SUBPROGRAMS:
             self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
             log("=> Removing subprograms")
-            strategy = RemoveSubprograms()
             try:
-                strategy.run_on_file(self.context, file, self.run_predicate)
+                RemoveSubprograms().run_on_file(self.context, file, self.run_predicate)
             except lal.PropertyError:
                 # retry with a new context...
                 self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
-                strategy.run_on_file(self.context, file, self.run_predicate)
+                RemoveSubprograms().run_on_file(self.context, file, self.run_predicate)
 
         # Let's try removing packages
 
         if REMOVE_PACKAGES:
             self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
             log("=> Removing packages")
-
-            strategy = RemovePackages()
-            strategy.run_on_file(self.context, file, self.run_predicate)
+            RemovePackages().run_on_file(self.context, file, self.run_predicate)
 
         # Next remove the imports that we can remove
 
         if REMOVE_IMPORTS:
             log("=> Removing imports")
-            strategy = RemoveImports()
-            strategy.run_on_file(self.context, file, self.run_predicate)
+            RemoveImports().run_on_file(self.context, file, self.run_predicate)
 
         # Remove trivias
 
         if REMOVE_TRIVIAS:
             log("=> Removing blank lines and comments")
-            strategy = RemoveTrivias()
-            strategy.run_on_file(file, self.run_predicate)
+            RemoveTrivias().run_on_file(file, self.run_predicate)
 
         # Attempt to delete the file if it's empty-ish
 
         deletion_successful = False
         if ATTEMPT_DELETE:
             log("=> Attempting to delete")
-            strategy = DeleteEmptyUnits()
-            deletion_successful = strategy.run_on_file(
+            deletion_successful = DeleteEmptyUnits().run_on_file(
                 self.context, file, self.run_predicate
             )
 
