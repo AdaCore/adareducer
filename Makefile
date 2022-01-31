@@ -1,2 +1,2 @@
-test:
-	bash tests/test.sh
+demonstration:
+	bash demo/test.sh
