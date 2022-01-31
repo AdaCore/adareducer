@@ -15,7 +15,7 @@ import e3.testsuite
 from drivers.shell_script import ShellScriptDriver
 
 
-class AFLControlTestsuite(e3.testsuite.Testsuite):
+class AdaReducerTestsuite(e3.testsuite.Testsuite):
     tests_subdir = "tests"
     test_driver_map = {"shell_script": ShellScriptDriver}
     default_driver = "shell_script"
@@ -33,4 +33,4 @@ class AFLControlTestsuite(e3.testsuite.Testsuite):
         os.environ["ADAREDUCER"] = f"python {root_dir}/ada_reduce.py"
 
 if __name__ == "__main__":
-    AFLControlTestsuite(os.path.dirname(__file__)).testsuite_main()
+    AdaReducerTestsuite(os.path.dirname(__file__)).testsuite_main()
