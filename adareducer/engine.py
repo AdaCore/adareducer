@@ -32,6 +32,7 @@ REMOVE_SUBPROGRAMS = True
 REMOVE_IMPORTS = True
 REMOVE_TRIVIAS = True
 ATTEMPT_DELETE = True
+BRUTEFORCE_DELETE = True
 
 # In cautious mode, run the predicate after running each file as a sanity check
 CAUTIOUS_MODE = True
@@ -81,6 +82,23 @@ class Reducer(object):
         if print_if_error and not status:
             log(out.stdout.decode() + "\n" + out.stderr.decode())
         return status
+
+    def attempt_delete_all(self, files):
+        """attempt pretend-deletion of all files in files by appending
+           '.deleted' to the file name
+        """
+
+        def pretend_deletion(name):
+            return f"{file}.deleted"
+
+        for file in files:
+            os.rename(file, pretend_deletion(file))
+        if not self.run_predicate():
+            for file in files:
+                os.rename(pretend_deletion(file), file)
+            if len(files) > 1:
+                self.attempt_delete_all(files[: len(files) // 2])
+                self.attempt_delete_all(files[len(files) // 2 :])
 
     def attempt_delete(self, file):
         """attempt deletion of f"""
@@ -201,6 +219,14 @@ class Reducer(object):
             return
 
         # We've passed the sanity check, time to reduce!
+
+        # Attempt to remove all files in the project before doing any
+        # reduction: this might save time by deleting files we would have tried
+        # to reduce.
+        if BRUTEFORCE_DELETE:
+            self.attempt_delete_all(
+                [self.resolver.files[name] for name in self.resolver.files]
+            )
 
         # Prepare the list of files to reduce. First the main file.
         if self.single_file:
