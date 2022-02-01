@@ -19,7 +19,7 @@ run:
 The interface is similar to that of the
 [C-Reduce](https://embed.cs.utah.edu/creduce/) program for C/C++ code bases:
 
-    ada_reduce.py project_file oracle.sh
+    adareducer project_file oracle.sh
 
 Where `project_file` is the path to a valid `.gpr` project file, and
 `oracle.sh` is a bash script which returns `0` as long as the program satisfies

@@ -12,5 +12,9 @@ setup(
     description="Ada sources reducer for bug reproducers",
     install_requires=["libadalang", "click"],
     packages=["adareducer"],
-    scripts=["ada_reduce.py"],
+    entry_points={
+        "console_scripts": [
+            "adareducer = adareducer.main:main",
+        ]
+    },
 )
