@@ -264,7 +264,7 @@ class Reducer(object):
 
         if REMOVE_ASPECTS:
             self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
-            log("=> Removing Aspects")
+            log("=> Removing aspects")
             RemoveAspects().run_on_file(self.context, file, self.run_predicate)
 
         # Remove subprograms
