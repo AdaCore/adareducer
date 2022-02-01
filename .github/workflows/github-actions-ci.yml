@@ -1,0 +1,53 @@
+name: GitHub Actions Demo
+on: [push]
+jobs:
+  CI-build-and-test:
+    strategy:
+      matrix:
+        os: [ubuntu-18.04]
+
+    env:
+        LIBADALANG_INSTALL_PREFIX: /tmp/ADALIB_DIR
+        CACHED_GNAT: cached_gnat
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - run: echo "🎉 The job was automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "🔎 The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+
+      - name: Setup Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      - name: Setup e3-testsuite
+        run: pip install --user e3-testsuite && python -c "import sys;print('e3' in sys.modules)"
+
+      - name: Install libadalang from the GHA cache
+        env:
+          AWS_ACCESS_KEY_ID: ${{secrets.GHA_CACHE_ACCESS_KEY_ID}}
+          AWS_SECRET_ACCESS_KEY: ${{secrets.GHA_CACHE_SECRET}}
+        run: |
+          mkdir -p $LIBADALANG_INSTALL_PREFIX
+          FILE=libadalang-${{ runner.os }}-master-dbg-relocatable.tar.gz
+          aws s3 cp s3://adacore-gha-tray-eu-west-1/libadalang/$FILE . --sse=AES256
+          tar xzf $FILE -C $LIBADALANG_INSTALL_PREFIX
+          rm -f -v $FILE
+
+      - name: Check out repository code
+        uses: actions/checkout@v2
+
+      - uses: actions/cache@v2
+        with:
+          path: ${{ env.CACHED_GNAT }}
+          key: ${{ runner.os }}-alire-2021
+          restore-keys: ${{ runner.os }}-alire-2021
+      - name: Get GNAT toolchain with alire
+        uses: alire-project/setup-alire@v1
+        with:
+          toolchain: gnat_native^11 gprbuild^21
+          toolchain_dir: ${{ env.CACHED_GNAT }}
+
+      - name: Run the CI
+        run: .github/workflows/ci.sh

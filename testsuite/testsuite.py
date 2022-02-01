@@ -9,6 +9,7 @@ Run the adareducer testsuite. This requires e3-testsuite.
 """
 
 import os
+import sys
 
 import e3.testsuite
 
@@ -33,4 +34,4 @@ class AdaReducerTestsuite(e3.testsuite.Testsuite):
         os.environ["ADAREDUCER"] = f"{root_dir}/adareducer"
 
 if __name__ == "__main__":
-    AdaReducerTestsuite(os.path.dirname(__file__)).testsuite_main()
+    sys.exit(AdaReducerTestsuite(os.path.dirname(__file__)).testsuite_main())
