@@ -14,7 +14,7 @@ from adareducer.remove_statement import RemoveStatements
 from adareducer.remove_subprograms import RemoveSubprograms
 from adareducer.remove_imports import RemoveImports
 from adareducer.remove_trivias import RemoveTrivias
-from adareducer.remove_generic_nodes import RemovePackages
+from adareducer.remove_generic_nodes import RemovePackages, RemoveAspects
 
 # TODO:
 #   - REMOVE .adbs in the order of .ads's
@@ -27,6 +27,7 @@ from adareducer.remove_generic_nodes import RemovePackages
 # Debug convenience bits
 EMPTY_OUT_BODIES_BRUTE_FORCE = True
 REMOVE_PACKAGES = True
+REMOVE_ASPECTS = True
 EMPTY_OUT_BODIES_STATEMENTS = True
 REMOVE_SUBPROGRAMS = True
 REMOVE_IMPORTS = True
@@ -258,6 +259,13 @@ class Reducer(object):
             RemoveStatements().run_on_file(
                 unit, buf.lines, self.run_predicate, lambda: buf.save()
             )
+
+        # Let's try removing aspects
+
+        if REMOVE_ASPECTS:
+            self.context = lal.AnalysisContext(unit_provider=self.unit_provider)
+            log("=> Removing aspects")
+            RemoveAspects().run_on_file(self.context, file, self.run_predicate)
 
         # Remove subprograms
 

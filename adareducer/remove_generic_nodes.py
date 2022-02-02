@@ -103,3 +103,40 @@ class RemovePackages(StrategyInterface):
         t = to_tree(chunks)
         r = dichototree(t, predicate, self.save)
         return r
+
+
+class RemoveAspect(AbstractRemoveNode):
+    def __init__(self, node, buffers):
+        super().__init__(node, buffers)
+
+    def find_locations_to_remove(self):
+        self.add_location_to_replace_with_empty(self.node)
+
+
+class RemoveAspects(StrategyInterface):
+    """ Remove aspects"""
+
+    def save(self):
+        for file in self.buffers:
+            self.buffers[file].save()
+
+    def run_on_file(self, context, file, predicate):
+        self.context = context
+        self.predicate = predicate
+
+        self.buffers = {file: Buffer(file)}
+        unit = self.context.get_from_file(file)
+
+        if unit.root is None:
+            return
+
+        # List all aspects in the file
+
+        chunks = []
+        for pbody in unit.root.findall(lambda x: x.is_a(lal.AspectSpec)):
+            # Create a chunk for each aspect
+            chunks.append(RemoveAspect(pbody, self.buffers))
+
+        t = to_tree(chunks)
+        r = dichototree(t, predicate, self.save)
+        return r
