@@ -1,7 +1,7 @@
 import libadalang as lal
-from adareducer.types import replace, infer_or_equal
-from adareducer.interfaces import ChunkInterface, StrategyInterface
-from adareducer.dichotomy import to_tree, dichototree
+from ada_reducer.types import replace, infer_or_equal
+from ada_reducer.interfaces import ChunkInterface, StrategyInterface
+from ada_reducer.dichotomy import to_tree, dichototree
 
 
 class RemoveStatement(ChunkInterface):

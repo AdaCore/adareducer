@@ -3,18 +3,18 @@ import os
 import sys
 import libadalang as lal
 
-from adareducer.types import Buffer
-from adareducer.project_support import ProjectResolver
-from adareducer.gui import log, GUI
+from ada_reducer.types import Buffer
+from ada_reducer.project_support import ProjectResolver
+from ada_reducer.gui import log, GUI
 
 # Strategies
-from adareducer.delete_empty_units import DeleteEmptyUnits
-from adareducer.hollow_body import HollowOutSubprograms
-from adareducer.remove_statement import RemoveStatements
-from adareducer.remove_subprograms import RemoveSubprograms
-from adareducer.remove_imports import RemoveImports
-from adareducer.remove_trivias import RemoveTrivias
-from adareducer.remove_generic_nodes import RemovePackages, RemoveAspects
+from ada_reducer.delete_empty_units import DeleteEmptyUnits
+from ada_reducer.hollow_body import HollowOutSubprograms
+from ada_reducer.remove_statement import RemoveStatements
+from ada_reducer.remove_subprograms import RemoveSubprograms
+from ada_reducer.remove_imports import RemoveImports
+from ada_reducer.remove_trivias import RemoveTrivias
+from ada_reducer.remove_generic_nodes import RemovePackages, RemoveAspects
 
 # TODO:
 #   - REMOVE .adbs in the order of .ads's
