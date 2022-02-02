@@ -11,10 +11,10 @@ setup(
     url="https://github.com/AdaCore/adareducer",
     description="Ada sources reducer for bug reproducers",
     install_requires=["libadalang", "click"],
-    packages=["adareducer"],
+    packages=["ada_reducer"],
     entry_points={
         "console_scripts": [
-            "adareducer = adareducer.main:main",
+            "adareducer = ada_reducer.main:main",
         ]
     },
 )

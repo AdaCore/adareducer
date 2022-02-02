@@ -30,7 +30,7 @@ class AdaReducerTestsuite(e3.testsuite.Testsuite):
             os.environ.get("PYTHONPATH", ""),
         )
 
-        os.environ["ADAREDUCER"] = f"python {root_dir}/ada_reduce.py"
+        os.environ["ADAREDUCER"] = f"{root_dir}/adareducer"
 
 if __name__ == "__main__":
     AdaReducerTestsuite(os.path.dirname(__file__)).testsuite_main()

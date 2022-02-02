@@ -1,7 +1,7 @@
 import libadalang as lal
-from adareducer.types import Buffer
-from adareducer.interfaces import ChunkInterface, StrategyInterface
-from adareducer.dichotomy import dichotomize
+from ada_reducer.types import Buffer
+from ada_reducer.interfaces import ChunkInterface, StrategyInterface
+from ada_reducer.dichotomy import dichotomize
 
 
 class RemoveClause(ChunkInterface):

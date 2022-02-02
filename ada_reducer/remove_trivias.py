@@ -1,5 +1,5 @@
-from adareducer.types import Buffer
-from adareducer.interfaces import StrategyInterface
+from ada_reducer.types import Buffer
+from ada_reducer.interfaces import StrategyInterface
 
 
 class RemoveTrivias(StrategyInterface):

@@ -1,4 +1,4 @@
-from adareducer.gui import log
+from ada_reducer.gui import log
 
 
 def dichotomize(chunks, predicate, save):
