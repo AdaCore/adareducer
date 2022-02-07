@@ -1,0 +1,3 @@
+package a is
+   procedure Foo is null;
+end a;

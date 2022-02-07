@@ -1,0 +1,4 @@
+with "src_q/q";
+
+project p is
+end p;

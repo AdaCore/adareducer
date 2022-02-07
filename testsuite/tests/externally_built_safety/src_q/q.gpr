@@ -1,0 +1,6 @@
+project Q is
+  type eb_type is ("true", "false");
+  eb : eb_type := external("EXTERNALLY_BUILT", "false");
+
+  for Externally_Built use eb;
+end Q;
