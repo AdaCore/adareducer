@@ -41,3 +41,6 @@ If you are interested in getting the minimum program that compiles and prints
 
     # Launch the program and verify that it prints "hello"
     ./main | grep "hello"
+
+### Dockerfile
+To use the dockezrfile, you will currently need to build your own base images. Instructions for how to do this can be found in [AdaCore/gnat-docker](https://github.com/AdaCore/gnat-docker/).

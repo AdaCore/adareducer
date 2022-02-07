@@ -11,7 +11,7 @@ trap \
 cp -R demo/orig/* $ADAREDUCER_TEMP_DIR
 
 # Run adareducer!
-python adareducer $ADAREDUCER_TEMP_DIR/p.gpr demo/oracle.sh
+bash adareducer $ADAREDUCER_TEMP_DIR/p.gpr demo/oracle.sh
 
 # Clean up
 rm -rf $ADAREDUCER_TEMP_DIR
