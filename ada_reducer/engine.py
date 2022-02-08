@@ -48,6 +48,7 @@ filesystem timestamps, this will fool this check.
 If you are using "gprbuild" in your predicate, make sure to pass "-m2".
 """
 
+
 class StrategyStats(object):
     def __init__(self, characters_removed, time):
         self.characters_removed = characters_removed
@@ -86,7 +87,7 @@ class Reducer(object):
 
     def attempt_delete_all(self, files):
         """attempt pretend-deletion of all files in files by appending
-           '.deleted' to the file name
+        '.deleted' to the file name
         """
 
         def pretend_deletion(name):
@@ -114,7 +115,7 @@ class Reducer(object):
 
     def sort_ads_files(self):
         """Sort .ads files into a tree structure, allowing to process
-           the leaf nodes first"""
+        the leaf nodes first"""
 
         ads_dict = {}
         # A dict showing dependencies of als
@@ -258,7 +259,7 @@ class Reducer(object):
     def apply_strategies_on_file(self, file, buf) -> int:
         """Apply all the strategies on the given buf.
 
-           Return the number of characters removed.
+        Return the number of characters removed.
         """
         count = buf.count_chars()
         unit = self.context.get_from_file(file)
@@ -410,12 +411,15 @@ class Reducer(object):
                         # find the definition
                         if decl is not None:
                             file_to_add = decl.unit.filename
-                            if file_to_add.endswith(".ads"):
-                                # if it's a .ads we want to empty, empty
-                                # the .adb first, it will go faster
-                                adb = file_to_add[:-1] + "b"
-                                if os.path.exists(adb):
-                                    self.bodies_to_reduce.append(adb)
-                                self.ads_dict[file_to_add] = []
-                            else:
-                                self.bodies_to_reduce.append(file_to_add)
+
+                            # Only process files that are in the project closure
+                            if self.resolver.belongs_to_project(file_to_add):
+                                if file_to_add.endswith(".ads"):
+                                    # if it's a .ads we want to empty, empty
+                                    # the .adb first, it will go faster
+                                    adb = file_to_add[:-1] + "b"
+                                    if os.path.exists(adb):
+                                        self.bodies_to_reduce.append(adb)
+                                    self.ads_dict[file_to_add] = []
+                                else:
+                                    self.bodies_to_reduce.append(file_to_add)

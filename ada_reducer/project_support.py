@@ -8,8 +8,13 @@ class ProjectResolver(object):
 
     def __init__(self, project_file):
         self.files = {}
+        # The sources in this project tree, not including externally built
+        # projects.
+        # Keys: base names, values: full names
 
-        # Use the Libadalang API to query the sources for this project
+        # Use the Libadalang API to query the sources for this project.
+        # This collects the sources in all the project tree, not including
+        # sources in externally built projects.
         files = lal.SourceFiles.for_project(project_file)
 
         for full_path in files:
@@ -31,3 +36,10 @@ class ProjectResolver(object):
             print(f"file {basename} not found in project")
             return None
         return self.files[basename]
+
+    def belongs_to_project(self, filename):
+        """Return True iff filename is a source of this project tree,
+        not including externally built projects.
+        """
+        basename = PurePath(filename).name
+        return basename in self.files
