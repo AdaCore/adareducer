@@ -125,7 +125,7 @@ class Reducer(object):
         # First, add them all
         for x in self.resolver.files:
             full = self.resolver.files[x]
-            if full.endswith(".ads"):
+            if full.endswith(".ads") and os.path.exists(full):
                 ads_dict[full] = set()
 
         # Now iterate on all of them
@@ -226,6 +226,7 @@ class Reducer(object):
         # reduction: this might save time by deleting files we would have tried
         # to reduce.
         if BRUTEFORCE_DELETE:
+            log("=> Removing any unused files")
             self.attempt_delete_all(
                 [self.resolver.files[name] for name in self.resolver.files]
             )
