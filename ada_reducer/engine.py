@@ -25,6 +25,7 @@ from ada_reducer.remove_generic_nodes import RemovePackages, RemoveAspects
 #   - remove extraneous calls to predicate
 
 # Debug convenience bits
+REMOVE_TABS = True
 EMPTY_OUT_BODIES_BRUTE_FORCE = True
 REMOVE_PACKAGES = True
 REMOVE_ASPECTS = True
@@ -263,12 +264,25 @@ class Reducer(object):
         Return the number of characters removed.
         """
         count = buf.count_chars()
+
+        if REMOVE_TABS:
+            log("=> Removing tabs")
+            buf.strip_tabs()
+            if CAUTIOUS_MODE and buf.count_chars() < count:
+                # In cautious mode, if we actually did
+                # remove some tabs, run the predicate as a check.
+                if not self.run_predicate():
+                    log(f"The issue is gone after stripping TABs in {file}")
+                    log("adareducer cannot help in this case.")
+                    sys.exit(1)
+
         unit = self.context.get_from_file(file)
 
         if unit is None or unit.root is None:
             log(f"??? cannot find a root node for {file}")
             self.attempt_delete(file)
             return 0
+
 
         if EMPTY_OUT_BODIES_BRUTE_FORCE:
             log("=> Emptying out bodies (brute force)")

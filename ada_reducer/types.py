@@ -55,6 +55,12 @@ class Buffer(object):
         """See below"""
         return replace(self.lines, sloc_range, new_lines)
 
+    def strip_tabs(self):
+        newlines = [None]
+        for l in self.lines[1:]:
+            newlines.append(l.replace("\t", ""))
+        self.lines = newlines
+
     def count_chars(self):
         return count_chars(self.lines)
 
