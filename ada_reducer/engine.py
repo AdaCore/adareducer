@@ -3,7 +3,7 @@ import os
 import sys
 import libadalang as lal
 
-from ada_reducer.types import Buffer
+from ada_reducer.types import Buffer, DEBUG
 from ada_reducer.project_support import ProjectResolver
 from ada_reducer.gui import log, GUI
 
@@ -84,6 +84,9 @@ class Reducer(object):
         status = out.returncode == 0
         if print_if_error and not status:
             log(out.stdout.decode() + "\n" + out.stderr.decode())
+
+        if DEBUG:
+            print(f"oracle returned {out.returncode}")
         return status
 
     def attempt_delete_all(self, files):

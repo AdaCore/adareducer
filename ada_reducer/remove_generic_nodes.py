@@ -2,7 +2,7 @@ import os
 import libadalang as lal
 from ada_reducer.types import Buffer, infer_or_equal
 from ada_reducer.interfaces import ChunkInterface, StrategyInterface
-from ada_reducer.dichotomy import to_tree, dichototree
+from ada_reducer.dichotomy import to_tree, dichototree_buffers, dichototree
 
 
 DEBUG = False
@@ -11,7 +11,7 @@ DEBUG = False
 class AbstractRemoveNode(object):
     def __init__(self, node, buffers):
         self.node = node
-        self.buffers = buffers
+        self.buffers = {buffer.filename: buffer for buffer in buffers}
         self.locations_to_remove = []
         # a list which contains
         #  - (file, range, replacement_lines)
@@ -19,6 +19,10 @@ class AbstractRemoveNode(object):
         self.locations_removed = []
         # a list which contains
         #  - (file, range, replacement_lines)
+
+    def get_buffers(self):
+        """return the set of buffers concerned with this"""
+        return set([self.buffers[f] for f in self.buffers])
 
     def find_locations_to_remove(self):
         """Fill self.locations_to_remove with the locations to remove, based
@@ -79,15 +83,10 @@ class RemovePackage(AbstractRemoveNode):
 class RemovePackages(StrategyInterface):
     """ Remove package bodies """
 
-    def save(self):
-        for file in self.buffers:
-            self.buffers[file].save()
-
     def run_on_file(self, context, file, predicate):
         self.context = context
         self.predicate = predicate
 
-        self.buffers = {file: Buffer(file)}
         unit = self.context.get_from_file(file)
 
         if unit.root is None:
@@ -98,10 +97,14 @@ class RemovePackages(StrategyInterface):
         chunks = []
         for pbody in unit.root.findall(lambda x: x.is_a(lal.PackageBody)):
             # Create a chunk for each subprogram
-            chunks.append(RemovePackage(pbody, self.buffers))
+            chunks.append(RemovePackage(pbody, set([Buffer(file)])))
+
+        buffers = set()
+        for chunk in chunks:
+            buffers.update(chunk.get_buffers())
 
         t = to_tree(chunks)
-        r = dichototree(t, predicate, self.save)
+        r = dichototree_buffers(t, predicate, buffers)
         return r
 
 
@@ -116,15 +119,10 @@ class RemoveAspect(AbstractRemoveNode):
 class RemoveAspects(StrategyInterface):
     """ Remove aspects"""
 
-    def save(self):
-        for file in self.buffers:
-            self.buffers[file].save()
-
     def run_on_file(self, context, file, predicate):
         self.context = context
         self.predicate = predicate
 
-        self.buffers = {file: Buffer(file)}
         unit = self.context.get_from_file(file)
 
         if unit.root is None:
@@ -135,8 +133,13 @@ class RemoveAspects(StrategyInterface):
         chunks = []
         for pbody in unit.root.findall(lambda x: x.is_a(lal.AspectSpec)):
             # Create a chunk for each aspect
-            chunks.append(RemoveAspect(pbody, self.buffers))
+            chunks.append(RemoveAspect(pbody, set([Buffer(file)])))
 
+        buffers = set()
+        for chunk in chunks:
+            buffers.update(chunk.get_buffers())
+
+        print(buffers)
         t = to_tree(chunks)
-        r = dichototree(t, predicate, self.save)
+        r = dichototree_buffers(t, predicate, buffers)
         return r

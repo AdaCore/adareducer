@@ -1,5 +1,11 @@
 # Utility types
 
+from distutils.log import debug
+
+
+DEBUG = False
+
+debug_counter = 1
 
 class SLOC(object):
     def __init__(self, line, column):
@@ -48,8 +54,18 @@ class Buffer(object):
 
     def save(self, to_file=None):
         """ Write buffer to file from its line array, popping the one at first"""
-        with open(to_file if to_file is not None else self.filename, "w") as f:
+        global debug_counter
+        tgt = to_file if to_file is not None else self.filename
+        with open(tgt, "w") as f:
             f.write("\n".join(self.lines[1:]) + "\n")
+
+        if DEBUG:
+            tgt_dbg = tgt + "." + str(debug_counter)
+            with open(tgt_dbg, "w") as f:
+                debug_counter += 1
+                print(f"saving {tgt_dbg}")
+                f.write("\n".join(self.lines[1:]) + "\n")
+
 
     def replace(self, sloc_range, new_lines):
         """See below"""
@@ -65,6 +81,46 @@ class Buffer(object):
         return count_chars(self.lines)
 
 
+class Checkpoint(object):
+    """Create a checkpoint on a number of buffers
+
+    This is meant to use as a context manager:
+         with Checkpoint(buffers) as c:
+             # do some operations that change the buffer
+             # if the operations are successful, call this:
+             c.accept()
+             # if not, simply exit. Or call c.discard(). This
+             # will revert the changes
+    """
+    def __init__(self, buffers):
+        """buffers is a set of buffers"""
+        self.buffers = buffers
+        # Make a copy of the buffer lines
+        self.saved_lines = {buffer : list(buffer.lines) for buffer in self.buffers}
+
+        # Whether the user has accepted or discarded the changes
+        # manually, through a call to accept or discard
+        self.user_acted = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        if not self.user_acted:
+            self.discard()
+        if exc_type is not None:
+            raise
+        return False
+
+    def accept(self):
+        self.user_acted = True
+
+    def discard(self):
+        for buf in self.buffers:
+            buf.lines = self.saved_lines[buf]
+        self.user_acted = True
+
+
 def replace(lines, sloc_range, new_lines):
     """ Replace text at the given range with the new lines.
 
@@ -73,8 +129,6 @@ def replace(lines, sloc_range, new_lines):
           data that was replaced as lines)
 
        to ease undoing the replace"""
-
-    initial_len = len(lines)
 
     # cut
     text = (
@@ -126,7 +180,6 @@ def replace(lines, sloc_range, new_lines):
             sloc_range.start.line + len(new_lines) - 1, len(new_lines[-1]) + 1
         )
 
-    assert len(lines) == initial_len
     return (SLOC_Range(sloc_range.start, end_sloc), result)
 
 

@@ -1,6 +1,6 @@
-from src.types import SLOC, SLOC_Range, replace
-from src.interfaces import ChunkInterface
-from src.dichotomy import dichotomize
+from ada_reducer.types import SLOC, SLOC_Range, replace
+from ada_reducer.interfaces import ChunkInterface
+from ada_reducer.dichotomy import dichotomize
 
 lines = [None, "hello of fun", "beautiful", "world"]
 orig_lines = list(lines)
