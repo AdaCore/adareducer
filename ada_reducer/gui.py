@@ -1,7 +1,7 @@
 # In some environment (e.g. Windows), this module is not disfunctional
 try:
     from curses import wrapper
-except ModuleNotFoundError:
+except (ImportError, ModuleNotFoundError):
     wrapper = None
 
 
