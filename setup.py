@@ -10,7 +10,7 @@ setup(
     author_email="report@adacore.com",
     url="https://github.com/AdaCore/adareducer",
     description="Ada sources reducer for bug reproducers",
-    install_requires=["libadalang", "click"],
+    install_requires=["libadalang"],
     packages=["ada_reducer"],
     entry_points={
         "console_scripts": [
