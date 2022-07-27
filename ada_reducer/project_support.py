@@ -15,7 +15,12 @@ class ProjectResolver(object):
         # Use the Libadalang API to query the sources for this project.
         # This collects the sources in all the project tree, not including
         # sources in externally built projects.
-        files = lal.SourceFiles.for_project(project_file)
+        #
+        # TODO: It may be necessary to pass scenario variables, target and
+        # runtime name information here in order for the project file to load
+        # correctly.
+        gpr = lal.GPRProject(project_file)
+        files = gpr.source_files()
 
         for full_path in files:
             basename = PurePath(full_path).name
