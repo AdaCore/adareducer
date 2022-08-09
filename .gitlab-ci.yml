@@ -1,0 +1,14 @@
+stages:
+  - ci 
+
+ci-job:
+  tags:
+    - adareducer # The name of the base image
+  stage: ci
+  script:
+    - PATH=/it/e3/bin:$PATH
+    - cd /it/wave
+    - anod vcs --add-repo adareducer $CI_PROJECT_DIR
+    - anod build --minimal --disable-cathod adareducer
+    - anod test  --minimal --disable-cathod adareducer
+    - e3-testsuite-report x86_64-linux/adareducer-test/results/new
