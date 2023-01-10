@@ -1,1 +1,5 @@
 description: "externally_built_safety"
+control:
+  - [XFAIL,
+     "env.build.os.name == 'windows'",
+     "Pending resolution of VA24-041"]
