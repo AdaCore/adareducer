@@ -6,8 +6,6 @@ ci-job:
      - image:sandbox
   stage: ci
   script:
-    - . ~/.aws_container_credentials
-    - PATH=/it/e3/bin:$PATH
     - cd /it/wave
     - anod vcs --add-repo adareducer $CI_PROJECT_DIR
     - anod build adareducer
