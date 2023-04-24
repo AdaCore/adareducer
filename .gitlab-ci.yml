@@ -1,3 +1,9 @@
+# In this CI, we should only work in reaction to a Merge Request
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: always
+
 stages:
   - ci 
 
