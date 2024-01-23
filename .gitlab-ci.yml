@@ -16,7 +16,8 @@ ci-job:
     - anod vcs --add-repo adareducer $CI_PROJECT_DIR
     - anod build adareducer
     - anod test  adareducer
+    - BUILD_SPACE=$(anod info test adareducer $ACI_TRACK_QUALIFIER --show working_dir)
     - e3-testsuite-report
         --failure-exit-code 1
         --xunit-output $CI_PROJECT_DIR/xunit_output.xml
-        x86_64-linux/adareducer-test/results/new
+        $BUILD_SPACE/results/new
