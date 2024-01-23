@@ -1,0 +1,4 @@
+procedure Hello is
+begin
+   Ada.Text_IO.Put_Line ("pouet");
+end Hello;

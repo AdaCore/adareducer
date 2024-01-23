@@ -77,6 +77,8 @@ class Reducer(object):
         """Run predicate and return True iff predicate returned 0."""
         if self.script.endswith(".sh"):
             cmd = ["bash", self.script]
+        elif self.script.endswith(".ps1"):
+            cmd = ["powershell", "-File", self.script]
         else:
             cmd = [self.script]
 
