@@ -1,0 +1,6 @@
+description: "powershell"
+control:
+  - [SKIP,
+     "env.build.os.name != 'windows'",
+     "This is a Powershell test, supported only on Windows"]
+
