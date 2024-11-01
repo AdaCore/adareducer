@@ -1,23 +1,5 @@
-# In this CI, we should only work in reaction to a Merge Request
-workflow:
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: always
+include:
+  - component: $CI_SERVER_FQDN/eng/gitlab-templates/build@~latest
+    inputs:
+      anod-args: test adareducer
 
-stages:
-  - ci 
-
-ci-job:
-  services:
-     - image:sandbox
-  stage: ci
-  script:
-    - cd /it/wave
-    - anod vcs --add-repo adareducer $CI_PROJECT_DIR
-    - anod build adareducer
-    - anod test  adareducer
-    - BUILD_SPACE=$(anod info test adareducer $ACI_TRACK_QUALIFIER --show working_dir)
-    - e3-testsuite-report
-        --failure-exit-code 1
-        --xunit-output $CI_PROJECT_DIR/xunit_output.xml
-        $BUILD_SPACE/results/new
