@@ -1,5 +1,5 @@
 with Ada.Text_IO;
-procedure Hello is
+procedure World is
 begin
    Ada.Text_IO.Put_Line ("world");
-end Hello;
+end World;
