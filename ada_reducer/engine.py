@@ -110,7 +110,7 @@ class Reducer(object):
         buf = Buffer(file)
         os.remove(file)
         if self.run_predicate():
-            log("... yay, deleted \o/")
+            log("... yay, deleted \\o/")
         else:
             # put the file back
             buf.save()
@@ -354,7 +354,7 @@ class Reducer(object):
         # Fin
 
         if deletion_successful:
-            log("   File deleted! \o/")
+            log("   File deleted! \\o/")
             chars_removed = count
         else:
             buf = Buffer(file)
