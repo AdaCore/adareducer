@@ -2,4 +2,5 @@ include:
   - component: $CI_SERVER_FQDN/eng/gitlab-templates/build@~latest
     inputs:
       anod-args: test adareducer
+  - component: $CI_SERVER_FQDN/it/gitlab-templates/gitleaks@~latest
 
